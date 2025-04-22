@@ -1,0 +1,511 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ตารางวิเคราะห์หน่วยกิต</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+    
+        th, td {
+            border: 1px solid #444;
+            padding: 6px;
+            text-align: center;
+        }
+    
+        th {
+            background-color: #eee;
+        }
+    
+        input[type="number"] {
+            width: 40px;
+            text-align: center;
+        }
+    
+        .wide-input {
+            width: 100%;
+            box-sizing: border-box;
+        }
+    
+        .total-cell {
+            background-color: #f9f9f9;
+            font-weight: bold;
+        }
+    
+        textarea.rich-text {
+            width: 100%;
+            height: 50px;
+            resize: both;
+        }
+    
+        .delete-btn, .add-btn, .save-btn, .reset-btn, .close-btn {
+            padding: 4px 8px;
+            cursor: pointer;
+            border: none;
+            color: white;
+            margin: 4px;
+        }
+    
+        .delete-btn { background-color: #f44336; }
+        .add-btn    { background-color: #4CAF50; }
+        .save-btn   { background-color: #2196F3; }
+        .reset-btn  { background-color: orange; }   /* ✅ กลับมาเป็นสีส้ม */
+        .close-btn  { background-color: #888888; }
+
+        .plo-reset-btn {
+            background-color: white;
+            color: black;
+            border: 1px solid #ccc;
+            padding: 4px 8px;
+            cursor: pointer;
+            margin: 4px;
+        }
+    
+        .link-btn {
+            margin-right: 4px;
+            background: none;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .no-underline {
+           text-decoration: none;
+            font-size: 16px;
+            padding: 2px;
+            cursor: pointer;
+        }
+
+    </style>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const updateTotals = () => {
+            const columnSums = new Array(8).fill(0);
+            let grandTotal = 0;
+
+            // Update totals for General, Core, and Free Elective rows (excluding PLOs)
+            const includedRows = Array.from(document.querySelectorAll('#core-rows-table tbody tr'))
+                .filter(row =>
+                    row.id.startsWith('general-row-') ||
+                    row.id.startsWith('row-') ||
+                    row.querySelector('td strong')?.textContent?.includes('หมวดวิชาเลือกเสรี')
+                );
+
+            includedRows.forEach(row => {
+                const inputs = row.querySelectorAll('input[type="number"]');
+                let rowTotal = 0;
+                inputs.forEach((input, index) => {
+                    const value = parseInt(input.value) || 0;
+                    rowTotal += value;
+                    if (index < 8) columnSums[index] += value;
+                });
+                const totalCell = row.querySelector('.total-cell');
+                if (totalCell) totalCell.textContent = rowTotal;
+                grandTotal += rowTotal;
+            });
+
+            // Update summary row
+            document.querySelectorAll('#summary-row .summary-column').forEach((cell, i) => {
+                cell.textContent = columnSums[i];
+            });
+            const grandTotalCell = document.getElementById('grand-total');
+            if (grandTotalCell) grandTotalCell.textContent = grandTotal;
+
+            // Update only PLO rows (exclude others)
+            const ploRows = Array.from(document.querySelectorAll('#core-rows-table tbody tr[id^="plo-row-"]'));
+            ploRows.forEach(row => {
+                const inputs = row.querySelectorAll('input[type="number"]');
+                let rowTotal = 0;
+                inputs.forEach((input) => {
+                const value = parseInt(input.value) || 0;
+                rowTotal += value;
+            });
+
+            const totalCell = row.querySelector('.total-cell');
+            const ploTotalCredits = rowTotal;
+            const percent = (grandTotal > 0) ? ((ploTotalCredits / grandTotal) * 100).toFixed(2) : "0.00";
+
+            if (totalCell) {
+                totalCell.textContent = `(${ploTotalCredits} นก., ${percent}%)`;
+            }
+        });
+
+        // ✅ อัปเดตแถวสุดท้าย: รวมหน่วยกิต PLOs และ % รวม
+            const ploSummaryRow = document.querySelector('#core-rows-table tr:last-child td.total-cell');
+            if (ploSummaryRow) {
+                const ploRows = Array.from(document.querySelectorAll('#core-rows-table tbody tr[id^="plo-row-"]'));
+                let totalPLOCredits = 0;
+
+                // รวมหน่วยกิตจาก PLO ทุกแถว
+                ploRows.forEach(row => {
+                const inputs = row.querySelectorAll('input[type="number"]');
+                inputs.forEach(input => {
+                totalPLOCredits += parseInt(input.value) || 0;
+            });
+        });
+
+            const percentTotal = (grandTotal > 0) ? ((totalPLOCredits / grandTotal) * 100).toFixed(2) : "0.00";
+
+            // อัปเดตแสดงผล
+            ploSummaryRow.textContent = `(${totalPLOCredits} นก., ${percentTotal}%)`;
+        }
+    };
+
+        window.insertRow = function () {
+            const table = document.getElementById('core-rows-table');
+            const rowCount = document.querySelectorAll('tr[id^="row-"]').length;
+
+            // หาตำแหน่งแทรก ก่อน "หมวดวิชาเลือกเสรี"
+            const rows = document.querySelectorAll('#core-rows-table tbody tr');
+            let insertIndex = document.getElementById('summary-row').rowIndex;
+            rows.forEach(row => {
+            const cell = row.querySelector('td strong');
+            if (cell && cell.textContent.includes('หมวดวิชาเลือกเสรี')) {
+                insertIndex = row.rowIndex;
+            }
+            });
+
+            const newRow = table.insertRow(insertIndex);
+            newRow.id = 'row-' + rowCount;
+            newRow.innerHTML = `<td><button type="button" class="delete-btn" onclick="deleteRow(${rowCount})">-</button></td>
+            <td><input type="text" name="core_name_new_${rowCount}" class="wide-input" placeholder="ชื่อวิชา"></td>`;
+
+            for (let i = 0; i < 8; i++) {
+                newRow.innerHTML += `<td>
+                    <input type="number" name="core_credit_new_${rowCount}_${i}" value="0" min="0" oninput="updateTotals()">
+                </td>`;
+            }
+
+            newRow.innerHTML += `<td class="total-cell">0</td>`;
+            updateTotals();
+        };
+
+
+        window.insertGeneralRow = function () {
+            const table = document.getElementById('core-rows-table');
+            const rowCount = document.querySelectorAll('tr[id^="general-row-"]').length;
+            const insertIndex = 2 + rowCount;
+            const newRow = table.insertRow(insertIndex);
+            newRow.id = 'general-row-' + rowCount;
+            newRow.innerHTML = `<td><button type="button" class="delete-btn" onclick="deleteGeneralRow(${rowCount})">-</button></td>
+            <td><input type="text" name="general_name_new_${rowCount}" class="wide-input" placeholder="ชื่อวิชา"></td>`;
+
+            for (let i = 0; i < 8; i++) {
+            newRow.innerHTML += `<td>
+                <input type="number" name="general_credit_new_${rowCount}_${i}" value="0" min="0" oninput="updateTotals()">
+            </td>`;
+        }
+
+        newRow.innerHTML += `<td class="total-cell">0</td>`;
+        updateTotals();
+        };
+
+         window.deleteRow = idx => {
+            document.getElementById('row-' + idx)?.remove();
+            updateTotals();
+        };
+
+        window.deleteGeneralRow = idx => {
+            document.getElementById('general-row-' + idx)?.remove();
+            updateTotals();
+        };
+
+        window.updateTotals = updateTotals;
+        updateTotals();
+    });
+</script>
+
+
+</head>
+<body>
+    <p style="margin: 10px 0;">
+        <a href="{% url 'select_curriculum' %}" style="text-decoration: none; font-size: 16px;">⬅️ กลับไปเลือกหลักสูตร</a>
+    </p>
+    <form method="POST" action="{% url 'credit_table' curriculum_id=curriculum.id %}">
+        {% csrf_token %}
+        <div style="text-align: center; margin-bottom: 16px;">
+            <label for="curriculum_name" style="font-weight: bold; font-size: 18px;">ชื่อหลักสูตร</label><br>
+            <input type="text" id="curriculum_name" name="curriculum_name" value="{{ curriculum.name }}"
+                   style="text-align: center; font-size: 18px; font-weight: bold; padding: 6px; width: 420px; margin-top: 6px;" required>
+        </div>   {% csrf_token %}
+    <table id="core-rows-table">
+        <thead>
+        <tr>
+            <th></th>
+            <th>หมวดวิชา</th>
+            {% for header in headers %}<th>{{ header }}</th>{% endfor %}
+            <th>รวมหน่วยกิต</th>
+        </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><button type="button" class="add-btn" onclick="insertGeneralRow()">+</button></td>
+                <td><strong>หมวดวิชาศึกษาทั่วไป</strong></td>
+                {% for _ in headers %}<td></td>{% endfor %}
+                <td></td>
+            </tr>            
+            {% for row_id, name, credits, total in general_rows %}
+            <tr id="general-row-{{ forloop.counter0 }}">
+                <td>
+                    <button type="button" class="delete-btn" onclick="deleteGeneralRow({{ forloop.counter0 }})">-</button>
+                </td>
+                <td>
+                    <input type="text" name="general_name_{{ forloop.counter0 }}" value="{{ name }}" class="wide-input">
+                </td>
+                {% for credit in credits %}
+                <td>
+                    <div style="display: flex; align-items: center; justify-content: center;">
+                        <button type="button" class="link-btn"
+                        title="ดูรายวิชา"
+                        onclick="window.open('{% url 'course_list' curriculum_id=curriculum.id row_id=row_id semester=forloop.counter %}', '_blank')">📋</button>                                            
+                        <input type="number"
+                               name="general_credit_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}"
+                               value="{{ credit }}" min="0" oninput="updateTotals()">
+                    </div>
+                </td>
+                {% endfor %}
+                <td class="total-cell"></td>
+            </tr>
+            {% endfor %}
+            
+
+        <tr><td><button type="button" class="add-btn" onclick="insertRow()">+</button></td>
+            <td><strong>หมวดวิชาเฉพาะ</strong></td>
+            {% for _ in headers %}<td></td>{% endfor %}<td></td></tr>
+            {% for row_id, name, credits, total in core_rows %}
+            <tr id="row-{{ forloop.counter0 }}">
+                <td>
+                    <button type="button" class="delete-btn" onclick="deleteRow({{ forloop.counter0 }})">-</button>
+                </td>
+                <td>
+                    <input type="text" name="core_name_{{ forloop.counter0 }}" value="{{ name }}" class="wide-input">
+                </td>
+                {% for credit in credits %}
+                <td>
+                    <div style="display: flex; align-items: center; justify-content: center;">
+                        <button type="button" class="link-btn"
+                            onclick="window.open('{% url 'course_list' curriculum_id=curriculum.id row_id=row_id semester=forloop.counter %}', '_blank')">📋</button>
+                        <input type="number"
+                            name="core_credit_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}"
+                            value="{{ credit }}" min="0" oninput="updateTotals()">
+                    </div>
+                </td>
+                {% endfor %}
+                <td class="total-cell">{{ total }}</td>
+            </tr>
+            {% endfor %}            
+            
+        <tr>
+            <td></td>
+            <td><strong>{{ free_elective.0 }}</strong></td>
+            {% for credit in free_elective.1 %}
+              <td>
+                <button type="button" class="link-btn" onclick="window.open('{% url 'course_list' curriculum_id=curriculum.id row_id='free_elective' semester=forloop.counter %}', '_blank')">📋</button>
+                <input type="number" name="{{ free_elective.0 }}_{{ forloop.counter0 }}" value="{{ credit }}" min="0" oninput="updateTotals()">
+              </td>
+            {% endfor %}
+            <td class="total-cell">{{ free_elective.2 }}</td>
+          </tr>
+          
+
+        <tr id="summary-row">
+            <td colspan="2" style="font-weight: bold; background-color: #ddd;">รวมรายวิชาทั้งหมด</td>
+            {% for _ in headers %}<td class="summary-column total-cell">0</td>{% endfor %}
+            <td id="grand-total" class="total-cell">0</td>
+        </tr>
+
+        <tr>
+            <td><button type="button" class="add-btn" onclick="insertPLORow()">+</button></td>
+            <td><strong>หมวด PLOs บนฐานสมรรถนะ</strong></td>
+            {% for _ in headers %}<td></td>{% endfor %}
+            <td></td>
+        </tr>
+        {% for row_id, name, credits, total in plo_rows %}
+        <tr id="plo-row-{{ forloop.counter0 }}">
+            <td>
+                <button type="button" class="delete-btn" onclick="deletePLORow({{ forloop.counter0 }})">-</button>
+            </td>
+            <td>
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <label class="plo-label">PLO{{ forloop.counter }}</label>
+                    <button type="button" class="plo-reset-btn" onclick="resetTextareaSize(this)">🔄</button>
+                </div>
+                <textarea name="plo_name_{{ row_id }}" class="rich-text" 
+                    {% if has_saved %}readonly{% else %}oninput="lockPLOPrefix(this)"{% endif %}>{{ name }}</textarea>            
+            </td>
+        
+            {% for sem in headers|length|to_range %}
+            <td>
+                <div style="display: flex; align-items: center; gap: 4px; justify-content: center;">
+                    <a href="{% url 'course_list_plo' curriculum_id=curriculum.id row_id=row_id semester=sem %}"
+                       class="no-underline" target="_blank" title="ดูรายวิชา">📋</a>
+                    {% with row_id_str=row_id|stringformat:'s' sem_str=sem|stringformat:'s' %}
+                        {% with key=row_id_str|add:'_'|add:sem_str %}
+                            <input type="number" value="{{ plo_course_totals|get_item:key }}" readonly 
+                                   style="width: 40px; text-align: center; background-color: #f3f3f3; border: 1px solid #ccc;">
+                        {% endwith %}
+                    {% endwith %}
+                </div>
+            </td>
+            {% endfor %}       
+        
+            <!-- ✅ ช่องสุดท้าย: แก้ไขแล้ว -->
+            <td class="total-cell">
+                ({{ total }} นก., {{ plo_percentages|get_item:row_id|floatformat:2 }}%)
+            </td>
+        </tr>
+        {% endfor %}
+                
+        <tr style="background-color: #eef;">
+            <td colspan="2"><strong>รวมหน่วยกิตหมวด PLOs</strong></td>
+            {% for sem in headers|length|to_range %}
+                <td><input type="number" value="{{ plo_semester_totals|get_item:sem }}" readonly></td>
+            {% endfor %}
+            <td class="total-cell">
+                {% with total_plo=plo_semester_totals.values|sum_list %}
+                    {% with total_percent=plo_percentages.values|sum_list %}
+                        ({{ total_plo }} นก., {{ total_percent|floatformat:2 }}%)
+                    {% endwith %}
+                {% endwith %}
+            </td>
+        </tr>                           
+        </tbody>
+    </table>
+    <div style="margin-top: 16px;">
+        <button type="submit" class="save-btn">📂 บันทึกการเปลี่ยนแปลง</button>
+    </div>
+</form>
+<form method="POST" action="{% url 'reset_credit_table' curriculum_id=curriculum.id %}" style="margin-top: 10px;" onsubmit="return confirm('คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตตาราง? การดำเนินการนี้จะลบข้อมูลทั้งหมด!')">
+    {% csrf_token %}
+    <button type="submit" class="reset-btn">♻️ รีเซ็ตตาราง</button>
+</form>
+<script>
+    function resetTextareaSize(button) {
+        const container = button.parentElement;
+        const textarea = container.nextElementSibling;
+        if (textarea && textarea.tagName === 'TEXTAREA') {
+            textarea.style.width = '100%';
+            textarea.style.height = '50px';
+        }
+    }
+
+    // 🔒 ล็อกไม่ให้แก้ prefix PLOn:
+    function lockPLOPrefix(textarea) {
+    const row = textarea.closest('tr');
+    const label = row?.querySelector('.plo-label');
+    if (!label) return;
+
+    const expectedPrefix = label.textContent + ':';
+    const lines = textarea.value.split('\n');
+
+    if (!lines[0].startsWith(expectedPrefix)) {
+        const suffix = lines[0].replace(/^PLO\s*\d+\s*:?\s*/, '').trim();
+        lines[0] = `${expectedPrefix} ${suffix}`.trim();
+        textarea.value = lines.join('\n');
+    }
+}
+
+    // ✅ อัปเดต label และ prefix
+    function updatePLOLabels() {
+        const rows = document.querySelectorAll('tr[id^="plo-row-"]');
+
+        rows.forEach((row, index) => {
+            const label = row.querySelector('.plo-label');
+            const textarea = row.querySelector('textarea.rich-text');
+            const newPLO = `PLO${index + 1}`;
+
+            // ✅ เปลี่ยน label
+            if (label) {
+                label.textContent = newPLO;
+            }
+
+            // ✅ เปลี่ยน prefix เฉพาะบรรทัดแรก โดย "เก็บข้อความต่อท้ายไว้"
+            if (textarea) {
+                const lines = textarea.value.split('\n');
+
+                if (lines[0].startsWith('PLO')) {
+                    const suffix = lines[0].replace(/^PLO\s*\d+\s*:?/, '').trim();  // ✅ เก็บข้อความต่อท้าย
+                    lines[0] = `${newPLO}: ${suffix}`.trim();  // ✅ รวม prefix ใหม่กับข้อความเดิม
+                    textarea.value = lines.join('\n');
+                } else if (textarea.value.trim() === '') {
+                    textarea.value = `${newPLO}: `;
+                }
+            }
+        });
+    }
+
+
+    window.addEventListener('DOMContentLoaded', () => {
+        updatePLOLabels();
+    });
+
+    window.insertPLORow = function () {
+        const table = document.getElementById('core-rows-table');
+        const ploRows = document.querySelectorAll('tr[id^="plo-row-"]');
+        const rowCount = ploRows.length;
+
+let insertIndex;
+        if (ploRows.length > 0) {
+            insertIndex = ploRows[ploRows.length - 1].rowIndex + 1;
+        } else {
+            const headerRow = Array.from(table.rows).find(row =>
+            row.cells[1]?.textContent?.includes('หมวด PLOs')
+            );
+            insertIndex = headerRow ? headerRow.rowIndex + 1 : table.rows.length;
+        }
+
+        const newRow = table.insertRow(insertIndex);
+        newRow.id = 'plo-row-' + rowCount;
+
+        newRow.innerHTML = `
+            <td><button type="button" class="delete-btn" onclick="deletePLORow(${rowCount})">-</button></td>
+            <td>
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <label class="plo-label">PLO${rowCount + 1}</label>
+                    <button type="button" class="plo-reset-btn" onclick="resetTextareaSize(this)">🔄</button>
+                </div>
+                <textarea name="plo_name_new_${rowCount}" class="rich-text" oninput="lockPLOPrefix(this)"></textarea>
+            </td>`;
+
+        for (let i = 0; i < 8; i++) {
+            newRow.innerHTML += `
+                <td>
+                    <input type="number" name="plo_credit_new_${rowCount}_${i}" value="0" min="0" oninput="updateTotals()">
+                </td>`;
+        }
+
+        newRow.innerHTML += `<td class="total-cell">0</td>`;
+
+        updateTotals();
+        updatePLOLabels();
+    };
+
+    window.deletePLORow = function (idx) {
+        const row = document.getElementById('plo-row-' + idx);
+        if (row) row.remove();
+        updateTotals();
+        updatePLOLabels();
+    };
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const input = document.getElementById("curriculum_name");
+        const adjustWidth = () => {
+            const span = document.createElement("span");
+            span.style.visibility = "hidden";
+            span.style.position = "absolute";
+            span.style.whiteSpace = "nowrap";
+            span.style.font = window.getComputedStyle(input).font;
+            span.textContent = input.value || input.placeholder || "";
+            document.body.appendChild(span);
+            input.style.width = (span.offsetWidth + 30) + "px";
+            document.body.removeChild(span);
+        };
+        input.addEventListener("input", adjustWidth);
+        adjustWidth();  // เรียกครั้งแรก
+    });
+</script>
+</body>
+</html>

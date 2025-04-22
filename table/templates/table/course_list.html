@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="th">
+{% load custom_filters %}
+<head>
+    <meta charset="UTF-8">
+    <title>รายการรายวิชา</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #444;
+            padding: 6px;
+            text-align: center;
+        }
+        th {
+            background-color: #eee;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 4px;
+        }
+        .delete-btn, .add-btn, .save-btn, .reset-btn, .close-btn {
+            padding: 4px 8px;
+            cursor: pointer;
+            border: none;
+            color: white;
+            margin: 4px;
+        }
+        .delete-btn { background-color: #f44336; }
+        .add-btn    { background-color: #4CAF50; }
+        .save-btn   { background-color: #2196F3; }
+        .reset-btn  { background-color: orange; }
+        .close-btn {
+            background-color: #e53935;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 6px;
+            font-size: 16px;
+            display: block;
+            margin: 20px auto 0;
+        }    
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            let courseCounter = document.querySelectorAll('#course-list tbody tr').length;
+
+            window.addCourseRow = function () {
+                const table = document.querySelector('#course-list tbody');
+                const row = table.insertRow();
+                row.id = 'course-row-' + courseCounter;
+
+                let dropdown = `<select name="plo[]">
+                        <option value="">--เลือก PLO--</option>`;
+                {% for plo in plo_choices %}
+                    dropdown += `<option value="{{ plo }}">{{ plo }}</option>`;
+                {% endfor %}
+                dropdown += `</select>`;
+
+                row.innerHTML = `
+                    <td><input type="text" name="course_code[]"></td>
+                    <td><input type="text" name="course_name[]"></td>
+                    <td><input type="number" name="credits[]" min="0"></td>
+                    <td>
+                        {% if plo_choices %}${dropdown}{% else %}<input type="text" name="plo[]">{% endif %}
+                    </td>
+                    <td><button type="button" class="delete-btn" onclick="deleteCourseRow(${courseCounter})">-</button></td>
+                `;
+                courseCounter++;
+            };
+
+            window.deleteCourseRow = function (index) {
+                const row = document.getElementById('course-row-' + index);
+                const table = document.querySelector('#course-list tbody');
+                if (row && table.rows.length > 1) {
+                    row.remove();
+                }
+            };
+
+            window.closeWindow = function () {
+                window.close();
+            };
+
+            // เตือนเมื่อจะออกจากหน้า (แต่ยกเลิกได้ถ้า submit)
+            const saveForm = document.querySelector('form[action*="save"]');
+            if (saveForm) {
+                saveForm.addEventListener('submit', function () {
+                    window.onbeforeunload = null;
+                });
+            }
+
+            window.onbeforeunload = function () {
+                return "คุณมีการเปลี่ยนแปลงข้อมูลที่ยังไม่ได้บันทึก! แน่ใจหรือไม่ว่าต้องการออก?";
+            };
+        });
+    </script>
+</head>
+<body>
+    {% with headers_list="ปีที่ 1/1,ปีที่ 1/2,ปีที่ 2/1,ปีที่ 2/2,ปีที่ 3/1,ปีที่ 3/2,ปีที่ 4/1,ปีที่ 4/2"|split:"," %}
+        <h2 style="text-align: center;">รายการรายวิชาใน {{ headers_list|index:semester }}</h2>
+        <h3 style="text-align: center;">จากหมวดวิชา: {{ row.name }}</h3>
+    {% endwith %}
+
+    <form method="POST" action="{% url 'save_course_list' curriculum_id=curriculum_id row_id=row.id semester=semester %}">
+        {% csrf_token %}
+        <table id="course-list">
+            <thead>
+                <tr>
+                    <th>รหัสวิชา</th>
+                    <th>ชื่อรายวิชา</th>
+                    <th>หน่วยกิต</th>
+                    <th>PLO</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if courses %}
+                    {% for course in courses %}
+                    <tr id="course-row-{{ forloop.counter0 }}">
+                        <td><input type="text" name="course_code[]" value="{{ course.course_code }}"></td>
+                        <td><input type="text" name="course_name[]" value="{{ course.course_name }}"></td>
+                        <td><input type="number" name="credits[]" value="{{ course.credits }}" min="0"></td>
+                        <td>
+                            {% if plo_choices %}
+                                <select name="plo[]">
+                                    <option value="">--เลือก PLO--</option>
+                                    {% for plo in plo_choices %}
+                                        <option value="{{ plo }}" {% if course.plo == plo %}selected{% endif %}>{{ plo }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% else %}
+                                <input type="text" name="plo[]" value="{{ course.plo }}">
+                            {% endif %}
+                        </td>
+                        <td><button type="button" class="delete-btn" onclick="deleteCourseRow({{ forloop.counter0 }})">-</button></td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr id="course-row-0">
+                        <td><input type="text" name="course_code[]"></td>
+                        <td><input type="text" name="course_name[]"></td>
+                        <td><input type="number" name="credits[]" min="0"></td>
+                        <td>
+                            {% if plo_choices %}
+                                <select name="plo[]">
+                                    <option value="">--เลือก PLO--</option>
+                                    {% for plo in plo_choices %}
+                                        <option value="{{ plo }}">{{ plo }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% else %}
+                                <input type="text" name="plo[]">
+                            {% endif %}
+                        </td>
+                        <td><button type="button" class="delete-btn" onclick="deleteCourseRow(0)">-</button></td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <div style="margin-top: 10px;">
+            <button type="button" class="add-btn" onclick="addCourseRow()">+ เพิ่มรายวิชา</button>
+            <button type="submit" class="save-btn">💾 บันทึกรายการ</button>
+        </div>
+    </form>
+    <form method="POST" action="{% url 'reset_course_list' curriculum_id=curriculum_id row_id=row.id semester=semester %}" style="margin-top: 10px;" onsubmit="return confirm('คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตตารางนี้? ข้อมูลรายวิชาทั้งหมดจะถูกลบ!')">
+        {% csrf_token %}
+        <button type="submit" class="reset-btn">♻️ รีเซ็ตตาราง</button>
+    </form>
+
+    <div style="margin-top: 20px; text-align: center;">
+        <button type="button" class="close-btn" onclick="closeWindow()">🔙 ปิดหน้าต่างนี้</button>
+    </div>
+</body>
+</html>

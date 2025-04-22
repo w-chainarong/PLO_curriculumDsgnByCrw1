@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>รายการรายวิชาในปีที่ {{ semester }}</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+        th, td {
+            border: 1px solid #444;
+            padding: 6px 12px;
+            text-align: center;
+        }
+        th {
+            background-color: #eee;
+        }
+        .readonly-cell {
+            background-color: #f9f9f9;
+        }
+        .header-title {
+            font-weight: bold;
+            font-size: 18px;
+            margin: 16px 0 8px;
+            text-align: center;
+        }
+        .footer {
+            margin-top: 16px;
+            text-align: right;
+        }
+        .btn-close {
+            background-color: #e53935;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 6px;
+            font-size: 16px;
+            display: block;
+            margin: 20px auto 0;
+        }      
+    </style>
+</head>
+
+<body>
+    <div class="header-title">รายการรายวิชาในปีที่ {{ semester_str }}</div>
+    <div class="header-title">จากหมวดวิชา: {{ row.name }}</div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>รหัสวิชา</th>
+                <th>ชื่อรายวิชา</th>
+                <th>หน่วยกิต</th>
+                <th>PLO</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for course in courses %}
+            <tr>
+                <td class="readonly-cell">{{ course.course_code }}</td>
+                <td class="readonly-cell">{{ course.course_name }}</td>
+                <td class="readonly-cell">{{ course.credits }}</td>
+                <td class="readonly-cell">{{ course.plo }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4">ไม่พบรายวิชาที่ตรงกับ PLO นี้ในปีที่ {{ semester }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="2" style="text-align: right;"><strong>รวมหน่วยกิต</strong></td>
+                <td colspan="2">{{ total_credits }}</td>
+            </tr>
+        </tfoot>
+    </table>
+    <div class="footer">
+        <button class="btn-close" onclick="window.close()">🔙 ปิดหน้าต่างนี้</button>
+    </div>
+</body>
+</html>
