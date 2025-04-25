@@ -33,6 +33,10 @@ ALLOWED_HOSTS = [
     'localhost'
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://plo-curriculum-dsgn.up.railway.app'
+]
+
 # Application definition
 
 INSTALLED_APPS = [
