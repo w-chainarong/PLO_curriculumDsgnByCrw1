@@ -1,9 +1,11 @@
 from django.contrib import admin
 from django.urls import path, include
-from table import views  # ✅ เพิ่มบรรทัดนี้ เพื่อเรียก views.select_curriculum
+from table import views
+from table.admin_views import sync_real_to_example  # ✅ เพิ่มตรงนี้
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', views.select_curriculum, name='select_curriculum'),  # ✅ หน้าเลือกหลักสูตร
-    path('', include('table.urls')),  # ✅ เส้นทางอื่น ๆ ของแอป table
+    path('admin/sync/', sync_real_to_example, name='sync_real_to_example'),  # ✅ เพิ่มเส้นทางให้ปุ่ม Sync ใช้ได้
+    path('', views.select_curriculum, name='select_curriculum'),
+    path('', include('table.urls')),
 ]

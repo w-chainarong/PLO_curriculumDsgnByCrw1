@@ -2,6 +2,7 @@ from django.urls import path  # ✅ บรรทัดนี้สำคัญ!
 from . import views
 from . import views_course
 from . import views_plo
+from . import admin_views  # ✅ เพิ่มบรรทัดนี้
 
 urlpatterns = [
     path('', views.select_curriculum, name='select_curriculum'),
@@ -15,4 +16,7 @@ urlpatterns = [
 
     # สำหรับ PLO
     path('curriculum/<int:curriculum_id>/course-list-plo/<int:row_id>/<int:semester>/', views_plo.course_list_plo, name='course_list_plo'),
+
+    # ✅ สำหรับ admin sync
+    path('sync-db/', admin_views.sync_real_to_example, name='sync_real_to_example'),
 ]

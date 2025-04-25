@@ -8,7 +8,7 @@
         body {
             font-family: sans-serif;
             padding: 30px;
-            background: linear-gradient(to bottom right, #f0f4ff, #f9f9f9); /* ✅ พื้นหลังไล่สี */
+            background: linear-gradient(to bottom right, #f0f4ff, #f9f9f9);
         }
 
         h2 {
@@ -25,7 +25,7 @@
             border: 1px solid #ccc;
             background-color: white;
             border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); /* ✅ เงาดูนุ่ม */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
 
         label {
@@ -35,10 +35,10 @@
             color: #444;
         }
 
-        select {
+        select, input[type="password"] {
             width: 100%;
             padding: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             font-size: 1em;
             border: 1px solid #bbb;
             border-radius: 6px;
@@ -66,12 +66,20 @@
             font-size: 0.95em;
         }
     </style>
+
+    <script>
+        function togglePassword() {
+            const isEdit = document.getElementById("mode_edit").checked;
+            document.getElementById("password_field").style.display = isEdit ? "block" : "none";
+        }
+    </script>
 </head>
 <body>
     <h2>🎓 เลือกหลักสูตรเพื่อเริ่มต้น</h2>
 
     <form method="post">
         {% csrf_token %}
+
         <label for="curriculum">หลักสูตร:</label>
         <select name="curriculum" id="curriculum" required>
             <option value="" disabled selected>-- กรุณาเลือกหลักสูตร --</option>
@@ -84,7 +92,19 @@
             {% endif %}
         </select>
 
+        <label><input type="radio" name="mode" value="view" checked onchange="togglePassword()"> อ่านอย่างเดียว</label>
+        <label><input type="radio" name="mode" value="edit" id="mode_edit" onchange="togglePassword()"> แก้ไข (ใส่รหัสผ่าน)</label>
+
+        <div id="password_field" style="display:none;">
+            <label for="password">รหัสผ่าน:</label>
+            <input type="password" name="password" id="password">
+        </div>
+
         <button type="submit">🚀 เริ่มต้น</button>
+
+        {% if error_message %}
+            <p class="warning">{{ error_message }}</p>
+        {% endif %}
     </form>
 </body>
 </html>

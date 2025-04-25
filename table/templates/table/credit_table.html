@@ -203,14 +203,29 @@
         updateTotals();
         };
 
-         window.deleteRow = idx => {
-            document.getElementById('row-' + idx)?.remove();
-            updateTotals();
-        };
+        window.deleteRow = idx => {
+            const row = document.getElementById('row-' + idx);
+            if (row) {
+                const hiddenInputs = row.querySelectorAll('input[type="hidden"]');
+                console.log('Hidden inputs found:', hiddenInputs.length);  // ✅ Debug log
+                hiddenInputs.forEach(input => input.remove());
 
+                row.remove();
+                updateTotals();
+            }
+        };
+        
         window.deleteGeneralRow = idx => {
-            document.getElementById('general-row-' + idx)?.remove();
-            updateTotals();
+            const row = document.getElementById('general-row-' + idx);
+            if (row) {
+                // 🔥 ลบ <input type="hidden" name="general_id_*"> ภายในแถว
+                const hiddenInput = row.querySelector(`input[name="general_id_${idx}"]`);
+                if (hiddenInput) hiddenInput.remove();
+
+                // 🔥 ลบทั้งแถวออกจาก DOM
+                row.remove();
+                updateTotals();
+            }
         };
 
         window.updateTotals = updateTotals;
@@ -253,6 +268,7 @@
                     <button type="button" class="delete-btn" onclick="deleteGeneralRow({{ forloop.counter0 }})">-</button>
                 </td>
                 <td>
+                    <input type="hidden" name="general_id_{{ forloop.counter0 }}" value="{{ row_id }}">
                     <input type="text" name="general_name_{{ forloop.counter0 }}" value="{{ name }}" class="wide-input">
                 </td>
                 {% for credit in credits %}
@@ -281,8 +297,8 @@
                     <button type="button" class="delete-btn" onclick="deleteRow({{ forloop.counter0 }})">-</button>
                 </td>
                 <td>
-                    <input type="text" name="core_name_{{ forloop.counter0 }}" value="{{ name }}" class="wide-input">
-                </td>
+                    <input type="hidden" name="core_id_{{ forloop.counter0 }}" value="{{ row_id }}">
+                    <input type="text" name="core_name_{{ forloop.counter0 }}" value="{{ name }}" class="wide-input"></td>
                 {% for credit in credits %}
                 <td>
                     <div style="display: flex; align-items: center; justify-content: center;">
@@ -333,8 +349,9 @@
                     <label class="plo-label">PLO{{ forloop.counter }}</label>
                     <button type="button" class="plo-reset-btn" onclick="resetTextareaSize(this)">🔄</button>
                 </div>
-                <textarea name="plo_name_{{ row_id }}" class="rich-text" 
-                    {% if has_saved %}readonly{% else %}oninput="lockPLOPrefix(this)"{% endif %}>{{ name }}</textarea>            
+                <input type="hidden" name="plo_id_{{ forloop.counter0 }}" value="{{ row_id }}">
+                <textarea name="plo_name_{{ forloop.counter0 }}" class="rich-text"
+                    {% if has_saved %}readonly{% else %}oninput="lockPLOPrefix(this)"{% endif %}>{{ name }}</textarea>
             </td>
         
             {% for sem in headers|length|to_range %}
@@ -394,19 +411,21 @@
 
     // 🔒 ล็อกไม่ให้แก้ prefix PLOn:
     function lockPLOPrefix(textarea) {
-    const row = textarea.closest('tr');
-    const label = row?.querySelector('.plo-label');
-    if (!label) return;
+        const row = textarea.closest('tr');
+        const label = row?.querySelector('.plo-label');
+        if (!label) return;
 
-    const expectedPrefix = label.textContent + ':';
-    const lines = textarea.value.split('\n');
+        const expectedPrefix = label.textContent + ':';
+        const lines = textarea.value.split('\n');
 
-    if (!lines[0].startsWith(expectedPrefix)) {
-        const suffix = lines[0].replace(/^PLO\s*\d+\s*:?\s*/, '').trim();
+        // ✅ ใช้ regex เพื่อแยก prefix เดิมออก
+        const prefixRegex = /^PLO\s*\d+\s*:?\s*/;  // รองรับทุกเวอร์ชันของ prefix
+        const suffix = lines[0].replace(prefixRegex, '').trim();
+
+        // ✅ ใส่ expectedPrefix + ช่องว่างเสมอ
         lines[0] = `${expectedPrefix} ${suffix}`.trim();
         textarea.value = lines.join('\n');
     }
-}
 
     // ✅ อัปเดต label และ prefix
     function updatePLOLabels() {

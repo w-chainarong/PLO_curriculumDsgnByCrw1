@@ -105,9 +105,12 @@
         <h2 style="text-align: center;">รายการรายวิชาใน {{ headers_list|index:semester }}</h2>
         <h3 style="text-align: center;">จากหมวดวิชา: {{ row.name }}</h3>
     {% endwith %}
-
+    
+    {% if not readonly %}
     <form method="POST" action="{% url 'save_course_list' curriculum_id=curriculum_id row_id=row.id semester=semester %}">
         {% csrf_token %}
+    {% endif %}
+    
         <table id="course-list">
             <thead>
                 <tr>
@@ -115,17 +118,35 @@
                     <th>ชื่อรายวิชา</th>
                     <th>หน่วยกิต</th>
                     <th>PLO</th>
-                    <th></th>
+                    {% if not readonly %}<th></th>{% endif %}
                 </tr>
             </thead>
             <tbody>
-                {% if courses %}
-                    {% for course in courses %}
-                    <tr id="course-row-{{ forloop.counter0 }}">
-                        <td><input type="text" name="course_code[]" value="{{ course.course_code }}"></td>
-                        <td><input type="text" name="course_name[]" value="{{ course.course_name }}"></td>
-                        <td><input type="number" name="credits[]" value="{{ course.credits }}" min="0"></td>
-                        <td>
+                {% for course in courses %}
+                <tr id="course-row-{{ forloop.counter0 }}">
+                    <td>
+                        {% if not readonly %}
+                            <input type="text" name="course_code[]" value="{{ course.course_code }}">
+                        {% else %}
+                            {{ course.course_code }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not readonly %}
+                            <input type="text" name="course_name[]" value="{{ course.course_name }}">
+                        {% else %}
+                            {{ course.course_name }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not readonly %}
+                            <input type="number" name="credits[]" value="{{ course.credits }}" min="0">
+                        {% else %}
+                            {{ course.credits }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not readonly %}
                             {% if plo_choices %}
                                 <select name="plo[]">
                                     <option value="">--เลือก PLO--</option>
@@ -136,45 +157,35 @@
                             {% else %}
                                 <input type="text" name="plo[]" value="{{ course.plo }}">
                             {% endif %}
-                        </td>
-                        <td><button type="button" class="delete-btn" onclick="deleteCourseRow({{ forloop.counter0 }})">-</button></td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr id="course-row-0">
-                        <td><input type="text" name="course_code[]"></td>
-                        <td><input type="text" name="course_name[]"></td>
-                        <td><input type="number" name="credits[]" min="0"></td>
-                        <td>
-                            {% if plo_choices %}
-                                <select name="plo[]">
-                                    <option value="">--เลือก PLO--</option>
-                                    {% for plo in plo_choices %}
-                                        <option value="{{ plo }}">{{ plo }}</option>
-                                    {% endfor %}
-                                </select>
-                            {% else %}
-                                <input type="text" name="plo[]">
-                            {% endif %}
-                        </td>
-                        <td><button type="button" class="delete-btn" onclick="deleteCourseRow(0)">-</button></td>
-                    </tr>
-                {% endif %}
+                        {% else %}
+                            {{ course.plo }}
+                        {% endif %}
+                    </td>
+                    {% if not readonly %}
+                    <td><button type="button" class="delete-btn" onclick="deleteCourseRow({{ forloop.counter0 }})">-</button></td>
+                    {% endif %}
+                </tr>
+                {% empty %}
+                <tr><td colspan="5">ไม่มีข้อมูลรายวิชา</td></tr>
+                {% endfor %}
             </tbody>
         </table>
-
+    
+        {% if not readonly %}
         <div style="margin-top: 10px;">
             <button type="button" class="add-btn" onclick="addCourseRow()">+ เพิ่มรายวิชา</button>
             <button type="submit" class="save-btn">💾 บันทึกรายการ</button>
         </div>
-    </form>
-    <form method="POST" action="{% url 'reset_course_list' curriculum_id=curriculum_id row_id=row.id semester=semester %}" style="margin-top: 10px;" onsubmit="return confirm('คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตตารางนี้? ข้อมูลรายวิชาทั้งหมดจะถูกลบ!')">
-        {% csrf_token %}
-        <button type="submit" class="reset-btn">♻️ รีเซ็ตตาราง</button>
-    </form>
-
-    <div style="margin-top: 20px; text-align: center;">
-        <button type="button" class="close-btn" onclick="closeWindow()">🔙 ปิดหน้าต่างนี้</button>
-    </div>
-</body>
+        </form>
+    
+        <form method="POST" action="{% url 'reset_course_list' curriculum_id=curriculum_id row_id=row.id semester=semester %}" style="margin-top: 10px;" onsubmit="return confirm('คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตตารางนี้? ข้อมูลรายวิชาทั้งหมดจะถูกลบ!')">
+            {% csrf_token %}
+            <button type="submit" class="reset-btn">♻️ รีเซ็ตตาราง</button>
+        </form>
+        {% endif %}
+    
+        <div style="margin-top: 20px; text-align: center;">
+            <button type="button" class="close-btn" onclick="closeWindow()">🔙 ปิดหน้าต่างนี้</button>
+        </div>
+    </body>
 </html>

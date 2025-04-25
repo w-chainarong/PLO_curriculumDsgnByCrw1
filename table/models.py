@@ -1,11 +1,12 @@
 from django.db import models
 
+    
 class Curriculum(models.Model):
     name = models.CharField(max_length=255)
-    year = models.IntegerField()
+    password = models.CharField(max_length=100, blank=True)  # ✅ เพิ่มรหัสผ่าน
 
     def __str__(self):
-        return f"{self.name} ({self.year})"
+        return self.name
 
 class CreditRow(models.Model):
     curriculum = models.ForeignKey(Curriculum, on_delete=models.CASCADE)  # ✅ เพิ่ม

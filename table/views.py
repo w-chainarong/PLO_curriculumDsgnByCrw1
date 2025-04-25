@@ -3,40 +3,73 @@ from .models import Curriculum, CreditRow, Course
 from django.db.models import Sum
 import re
 
-headers = ['ปีที่ 1/1', 'ปีที่ 1/2', 'ปีที่ 2/1', 'ปีที่ 2/2',
-           'ปีที่ 3/1', 'ปีที่ 3/2', 'ปีที่ 4/1', 'ปีที่ 4/2']
+headers = [
+    'ปีที่ 1/1', 'ปีที่ 1/2', 'ปีที่ 2/1', 'ปีที่ 2/2',
+    'ปีที่ 3/1', 'ปีที่ 3/2', 'ปีที่ 4/1', 'ปีที่ 4/2'
+]
+
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import Curriculum
 
 def select_curriculum(request):
     if request.method == 'POST':
         curriculum_id = request.POST.get('curriculum')
-        if curriculum_id:
-            return redirect('credit_table', curriculum_id=curriculum_id)
+        mode = request.POST.get('mode')
+        password = request.POST.get('password', '').strip()
 
-    curriculums = Curriculum.objects.all()
-    return render(request, 'table/select_curriculum.html', {'curriculums': curriculums})
+        if not curriculum_id:
+            return render(request, 'table/select_curriculum.html', {
+                'curriculums': Curriculum.objects.using('default').all(),
+                'error_message': 'กรุณาเลือกหลักสูตร',
+            })
+
+        curriculum = get_object_or_404(Curriculum.objects.using('default'), pk=curriculum_id)
+
+        if mode == 'edit' and password != curriculum.password:
+            return render(request, 'table/select_curriculum.html', {
+                'curriculums': Curriculum.objects.using('default').all(),
+                'error_message': 'รหัสผ่านไม่ถูกต้อง',
+            })
+
+        request.session['access_mode'] = mode  # ✅ บันทึกโหมดใน session
+        return redirect('credit_table', curriculum_id=curriculum.id)
+
+    return render(request, 'table/select_curriculum.html', {
+        'curriculums': Curriculum.objects.using('default').all()
+    })
+
+
 
 def credit_table(request, curriculum_id):
-    curriculum = get_object_or_404(Curriculum, pk=curriculum_id)
+    mode = request.session.get('access_mode', 'view')  # 'view' หรือ 'edit'
+    db = 'real' if mode == 'edit' else 'default'
 
-    if request.method == 'POST':
-        # ✅ บันทึกชื่อหลักสูตรถ้ามีการแก้ไข
+    curriculum = get_object_or_404(Curriculum.objects.using(db), pk=curriculum_id)
+
+    if request.method == 'POST' and mode == 'edit':
         new_name = request.POST.get('curriculum_name', '').strip()
         if new_name and new_name != curriculum.name:
             curriculum.name = new_name
-            curriculum.save()
+            curriculum.save(using='real')  # ต้องบันทึกลงฐาน real เสมอ
 
-        def delete_removed_rows(row_type, prefix_list):
-            posted_names = set()
-            for prefix in prefix_list:
+        def delete_removed_rows(row_type, id_prefixes):
+            posted_ids = set()
+            for prefix in id_prefixes:
                 pattern = re.compile(rf'{prefix}_(\d+)')
                 for key in request.POST:
                     match = pattern.match(key)
                     if match:
-                        index = match.group(1)
-                        name = request.POST.get(f'{prefix}_{index}', '').strip()
-                        if name:
-                            posted_names.add(name)
-            CreditRow.objects.filter(curriculum=curriculum, row_type=row_type).exclude(name__in=posted_names).delete()
+                        try:
+                            val = request.POST.get(key)
+                            if val:
+                                posted_ids.add(int(val))
+                        except (TypeError, ValueError):
+                            continue
+            if posted_ids:
+                CreditRow.objects.using('real').filter(
+                    curriculum=curriculum,
+                    row_type=row_type
+                ).exclude(id__in=posted_ids).delete()
 
         def save_rows(row_type, prefix, credit_prefix):
             pattern = re.compile(rf'{prefix}_(\d+)')
@@ -48,33 +81,29 @@ def credit_table(request, curriculum_id):
                     continue
 
                 credits = [int(request.POST.get(f'{credit_prefix}_{index}_{j}', 0)) for j in range(8)]
+                row_id_key = f'{row_type}_id_{index}'
+                row_id = request.POST.get(row_id_key)
 
-                row, created = CreditRow.objects.get_or_create(
-                    curriculum=curriculum,
-                    name=name,
-                    row_type=row_type,
-                    defaults={
-                        'credits_sem1': credits[0], 'credits_sem2': credits[1],
-                        'credits_sem3': credits[2], 'credits_sem4': credits[3],
-                        'credits_sem5': credits[4], 'credits_sem6': credits[5],
-                        'credits_sem7': credits[6], 'credits_sem8': credits[7],
-                    }
-                )
+                if row_id:
+                    try:
+                        row = CreditRow.objects.using('real').get(pk=row_id, curriculum=curriculum, row_type=row_type)
+                        row.name = name
+                        for i in range(8):
+                            setattr(row, f'credits_sem{i+1}', credits[i])
+                        row.save(using='real')
+                    except CreditRow.DoesNotExist:
+                        continue
+                else:
+                    CreditRow.objects.using('real').create(
+                        curriculum=curriculum,
+                        name=name,
+                        row_type=row_type,
+                        **{f'credits_sem{i+1}': credits[i] for i in range(8)}
+                    )
 
-                if not created:
-                    row.credits_sem1 = credits[0]
-                    row.credits_sem2 = credits[1]
-                    row.credits_sem3 = credits[2]
-                    row.credits_sem4 = credits[3]
-                    row.credits_sem5 = credits[4]
-                    row.credits_sem6 = credits[5]
-                    row.credits_sem7 = credits[6]
-                    row.credits_sem8 = credits[7]
-                    row.save()
-
-        delete_removed_rows('general', ['general_name', 'general_name_new'])
-        delete_removed_rows('core', ['core_name', 'core_name_new'])
-        delete_removed_rows('plo', ['plo_name', 'plo_name_new'])
+        delete_removed_rows('plo', ['plo_id'])
+        delete_removed_rows('core', ['core_id'])
+        delete_removed_rows('general', ['general_id'])
 
         save_rows('general', 'general_name', 'general_credit')
         save_rows('core', 'core_name', 'core_credit')
@@ -85,27 +114,21 @@ def credit_table(request, curriculum_id):
 
         free_name = 'หมวดวิชาเลือกเสรี'
         free_credits = [int(request.POST.get(f'{free_name}_{i}', 0)) for i in range(8)]
-        CreditRow.objects.update_or_create(
+        CreditRow.objects.using('real').update_or_create(
             curriculum=curriculum,
             name=free_name,
             row_type='free',
-            defaults={
-                'credits_sem1': free_credits[0], 'credits_sem2': free_credits[1],
-                'credits_sem3': free_credits[2], 'credits_sem4': free_credits[3],
-                'credits_sem5': free_credits[4], 'credits_sem6': free_credits[5],
-                'credits_sem7': free_credits[6], 'credits_sem8': free_credits[7],
-            }
+            defaults={f'credits_sem{i+1}': free_credits[i] for i in range(8)}
         )
 
         return redirect('credit_table', curriculum_id=curriculum.id)
 
-    all_rows = CreditRow.objects.filter(curriculum=curriculum)
+    all_rows = CreditRow.objects.using(db).filter(curriculum=curriculum)
     general_rows = [(row.id, row.name, row.credit_list(), row.total_credits()) for row in all_rows.filter(row_type='general')]
     core_rows = [(row.id, row.name, row.credit_list(), row.total_credits()) for row in all_rows.filter(row_type='core')]
     plo_rows = [(row.id, row.name, row.credit_list(), row.total_credits()) for row in all_rows.filter(row_type='plo').order_by('id')]
     free_elective = all_rows.filter(row_type='free').first()
     free_elective_tuple = (free_elective.name, free_elective.credit_list(), free_elective.total_credits()) if free_elective else None
-
     has_saved = request.method == 'POST'
 
     plo_course_totals = {}
@@ -113,38 +136,31 @@ def credit_table(request, curriculum_id):
         if row.name:
             plo_tag = row.name.split()[0]
             for semester in range(1, 9):
-                general_core_sum = Course.objects.filter(
+                general_core_sum = Course.objects.using(db).filter(
                     curriculum=curriculum,
                     semester=semester,
                     plo=plo_tag,
                     credit_row__row_type__in=['general', 'core']
                 ).aggregate(Sum('credits'))['credits__sum'] or 0
-
-                free_sum = Course.objects.filter(
+                free_sum = Course.objects.using(db).filter(
                     curriculum=curriculum,
                     semester=semester,
                     plo=plo_tag,
                     category='free_elective'
                 ).aggregate(Sum('credits'))['credits__sum'] or 0
-
                 key = f"{row.id}_{semester}"
                 plo_course_totals[key] = general_core_sum + free_sum
 
     plo_semester_totals = {i: 0 for i in range(1, 9)}
     for key, value in plo_course_totals.items():
         _, semester = key.split('_')
-        semester = int(semester)
-        plo_semester_totals[semester] += value
+        plo_semester_totals[int(semester)] += value
 
-    # ✅ คำนวณหน่วยกิตรวมของหลักสูตรทั้งหมด
     total_credits_all = sum(row.total_credits() for row in all_rows)
-
-    # ✅ คำนวณเปอร์เซ็นต์ของแต่ละ PLO
-    plo_percentages = {}
-    for row in all_rows.filter(row_type='plo'):
-        plo_percentages[str(row.id)] = (
-            round((row.total_credits() / total_credits_all) * 100, 2) if total_credits_all else 0
-        )
+    plo_percentages = {
+        str(row.id): round((row.total_credits() / total_credits_all) * 100, 2) if total_credits_all else 0
+        for row in all_rows.filter(row_type='plo')
+    }
 
     return render(request, 'table/credit_table.html', {
         'curriculum': curriculum,
@@ -156,17 +172,51 @@ def credit_table(request, curriculum_id):
         'has_saved': has_saved,
         'plo_course_totals': plo_course_totals,
         'plo_semester_totals': plo_semester_totals,
-        'plo_percentages': plo_percentages,   # ✅ เพิ่มตรงนี้
+        'plo_percentages': plo_percentages,
     })
 
 def reset_credit_table(request, curriculum_id):
-    curriculum = get_object_or_404(Curriculum, pk=curriculum_id)
+    mode = request.session.get('access_mode', 'view')
+    db = 'real' if mode == 'edit' else 'default'
+
+    if mode != 'edit':
+        # ✅ กรณีโหมดอ่านอย่างเดียว: แสดงข้อมูล + แจ้งเตือน
+        curriculum = get_object_or_404(Curriculum.objects.using(db), pk=curriculum_id)
+        all_rows = CreditRow.objects.using(db).filter(curriculum=curriculum)
+        general_rows = [(row.id, row.name, row.credit_list(), row.total_credits()) for row in all_rows.filter(row_type='general')]
+        core_rows = [(row.id, row.name, row.credit_list(), row.total_credits()) for row in all_rows.filter(row_type='core')]
+        plo_rows = [(row.id, row.name, row.credit_list(), row.total_credits()) for row in all_rows.filter(row_type='plo')]
+        free_elective = all_rows.filter(row_type='free').first()
+        free_elective_tuple = (free_elective.name, free_elective.credit_list(), free_elective.total_credits()) if free_elective else None
+        total_credits_all = sum(row.total_credits() for row in all_rows)
+        plo_percentages = {
+            str(row.id): round((row.total_credits() / total_credits_all) * 100, 2) if total_credits_all else 0
+            for row in all_rows.filter(row_type='plo')
+        }
+
+        return render(request, 'table/credit_table.html', {
+            'curriculum': curriculum,
+            'headers': headers,
+            'general_rows': general_rows,
+            'core_rows': core_rows,
+            'plo_rows': plo_rows,
+            'free_elective': free_elective_tuple,
+            'has_saved': False,
+            'plo_course_totals': {},
+            'plo_semester_totals': {},
+            'plo_percentages': plo_percentages,
+            'error_message': '🚫 ไม่สามารถรีเซตข้อมูลได้ในโหมดอ่านอย่างเดียว'
+        })
+
+    # ✅ โหมด edit: ล้างและสร้างข้อมูลใหม่
+    curriculum = get_object_or_404(Curriculum.objects.using(db), pk=curriculum_id)
 
     if request.method == 'POST':
-        # ลบข้อมูลเดิมทั้งหมดในตาราง CreditRow สำหรับหลักสูตรนี้
-        CreditRow.objects.filter(curriculum=curriculum, row_type__in=['general', 'core', 'plo', 'free']).delete()
+        CreditRow.objects.using(db).filter(
+            curriculum=curriculum,
+            row_type__in=['general', 'core', 'plo', 'free']
+        ).delete()
 
-        # ข้อมูล default สำหรับหมวดวิชาศึกษาทั่วไป
         general_data = [
             ('กลุ่มวิชาภาษา', [0]*8),
             ('กลุ่มวิชาสังคมศาสตร์', [0]*8),
@@ -176,8 +226,6 @@ def reset_credit_table(request, curriculum_id):
             ('กลุ่มวิชาคณิตศาสตร์และคอมพิวเตอร์', [0]*8),
             ('กลุ่มวิชาบูรณาการ', [0]*8)
         ]
-
-        # ข้อมูล default สำหรับหมวดวิชาเฉพาะ
         core_data = [
             ('กลุ่มวิชาพื้นฐานทางวิทยาศาสตร์และคณิตศาสตร์', [0]*8),
             ('กลุ่มวิชาพื้นฐานทางวิศวกรรม', [0]*8),
@@ -185,38 +233,26 @@ def reset_credit_table(request, curriculum_id):
             ('กลุ่มวิชาชีพเลือก', [0]*8),
             ('กลุ่มวิชาสร้างเสริมประสบการณ์ในวิชาชีพ', [0]*8)
         ]
+        plo_data = [('PLO1:', [0]*8)]
 
-        # ข้อมูล default สำหรับหมวด PLOs: มีเพียง 2 แถว
-        plo_data = [
-            ('PLO1:', [0]*8),
-        ]
-
-        # ฟังก์ชันช่วยสำหรับสร้าง CreditRow
         def create_rows(row_type, data):
             for name, credits in data:
-                CreditRow.objects.create(
+                CreditRow.objects.using(db).create(
                     curriculum=curriculum,
                     name=name,
                     row_type=row_type,
-                    credits_sem1=credits[0], credits_sem2=credits[1],
-                    credits_sem3=credits[2], credits_sem4=credits[3],
-                    credits_sem5=credits[4], credits_sem6=credits[5],
-                    credits_sem7=credits[6], credits_sem8=credits[7],
+                    **{f'credits_sem{i+1}': credits[i] for i in range(8)}
                 )
 
         create_rows('general', general_data)
         create_rows('core', core_data)
         create_rows('plo', plo_data)
 
-        # เพิ่มหมวดวิชาเลือกเสรี
-        CreditRow.objects.create(
+        CreditRow.objects.using(db).create(
             curriculum=curriculum,
             name='หมวดวิชาเลือกเสรี',
             row_type='free',
-            credits_sem1=0, credits_sem2=0,
-            credits_sem3=0, credits_sem4=0,
-            credits_sem5=0, credits_sem6=0,
-            credits_sem7=0, credits_sem8=0,
+            **{f'credits_sem{i+1}': 0 for i in range(8)}
         )
 
         return redirect('credit_table', curriculum_id=curriculum.id)

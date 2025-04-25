@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os  # อยู่ด้านบนสุด
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,8 +26,7 @@ SECRET_KEY = 'django-insecure-d@&q_w))4#yjtk&%u_dxdoc-vai(r3w&#4^v7jxtw6xtljf8ov
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['plo-curriculum-dsgn.up.railway.app']
-CSRF_TRUSTED_ORIGINS = ['https://plo-curriculum-dsgn.up.railway.app']
+ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -56,7 +56,7 @@ ROOT_URLCONF = 'PLO_curriculumDsgn1.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'table', 'templates')],  # ✅ เพิ่ม path นี้
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -77,10 +77,17 @@ WSGI_APPLICATION = 'PLO_curriculumDsgn1.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': BASE_DIR / 'example.sqlite3',  # ดูอย่างเดียว
+    },
+    'real': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'real.sqlite3',     # ใช้งานจริง
     }
 }
 
+
+# ✅ เพิ่มตรงนี้
+DATABASE_ROUTERS = ['PLO_curriculumDsgn1.dbrouters.AuthRouter']
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
