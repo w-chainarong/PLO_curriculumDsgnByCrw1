@@ -401,14 +401,15 @@
 </form>
 <script>
     function resetTextareaSize(button) {
-        const container = button.parentElement;
-        const textarea = container.nextElementSibling;
-        if (textarea && textarea.tagName === 'TEXTAREA') {
+    let parent = button.closest('td');  // 🔥 หา td ที่ใกล้ที่สุดที่เป็นพ่อของปุ่ม
+    if (parent) {
+        const textarea = parent.querySelector('textarea.rich-text');  // 🔥 หา textarea ภายใน td นั้น
+        if (textarea) {
             textarea.style.width = '100%';
             textarea.style.height = '50px';
+            }
         }
     }
-
     // 🔒 ล็อกไม่ให้แก้ prefix PLOn:
     function lockPLOPrefix(textarea) {
         const row = textarea.closest('tr');
@@ -484,7 +485,7 @@ let insertIndex;
             <td>
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <label class="plo-label">PLO${rowCount + 1}</label>
-                    <button type="button" class="plo-reset-btn" onclick="resetTextareaSize(this)">🔄</button>
+                    <button type="button" class="plo-reset-btn" onclick="location.reload();">🔄</button>
                 </div>
                 <textarea name="plo_name_new_${rowCount}" class="rich-text" oninput="lockPLOPrefix(this)"></textarea>
             </td>`;
