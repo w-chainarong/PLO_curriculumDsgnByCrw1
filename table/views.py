@@ -257,3 +257,19 @@ def reset_credit_table(request, curriculum_id):
 
         return redirect('credit_table', curriculum_id=curriculum.id)
 
+from django.http import FileResponse, Http404
+import os
+
+def download_database(request, db_name):
+    allowed = ['real.sqlite3', 'example.sqlite3']
+    if db_name not in allowed:
+        raise Http404("ไม่พบไฟล์ที่ร้องขอ")
+
+    # ดึงตำแหน่งไฟล์ฐานข้อมูลจากโฟลเดอร์โปรเจกต์หลัก
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    file_path = os.path.join(base_dir, db_name)
+
+    if os.path.exists(file_path):
+        return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=db_name)
+    else:
+        raise Http404("ไม่พบไฟล์ที่ร้องขอ")
