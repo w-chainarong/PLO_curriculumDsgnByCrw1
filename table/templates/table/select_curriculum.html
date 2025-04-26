@@ -11,6 +11,13 @@
             background: linear-gradient(to bottom right, #f0f4ff, #f9f9f9);
         }
 
+        .logo {
+            display: block;
+            margin: 0 auto 20px auto;
+            max-width: 300px;
+            height: auto;
+        }
+
         h2 {
             text-align: center;
             font-size: 1.6em;
@@ -75,6 +82,10 @@
     </script>
 </head>
 <body>
+
+    <!-- ✅ โลโก้ RMUTK แสดงตรงกลาง -->
+    <img src="{% static 'images/rmutk_log.png' %}" alt="RMUTK Logo" class="logo">
+
     <h2>🎓 เลือกหลักสูตรเพื่อเริ่มต้น</h2>
 
     <form method="post">
@@ -106,5 +117,6 @@
             <p class="warning">{{ error_message }}</p>
         {% endif %}
     </form>
+
 </body>
 </html>
