@@ -357,8 +357,8 @@
             {% for sem in headers|length|to_range %}
             <td>
                 <div style="display: flex; align-items: center; gap: 4px; justify-content: center;">
-                    <a href="{% url 'course_list_plo' curriculum_id=curriculum.id row_id=row_id semester=sem %}"
-                       class="no-underline" target="_blank" title="ดูรายวิชา">📋</a>
+                    <a href="{% url 'course_list_plo' curriculum_id=curriculum.id row_id=row_id semester=sem %}?mode={{ access_mode }}"
+                        class="no-underline" target="_blank" title="ดูรายวิชา">📋</a>
                     {% with row_id_str=row_id|stringformat:'s' sem_str=sem|stringformat:'s' %}
                         {% with key=row_id_str|add:'_'|add:sem_str %}
                             <input type="number" value="{{ plo_course_totals|get_item:key }}" readonly 

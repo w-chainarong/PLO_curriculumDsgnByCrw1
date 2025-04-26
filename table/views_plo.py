@@ -7,19 +7,23 @@ def convert_semester(sem):
     return f"{year}/{term}"
 
 def course_list_plo(request, curriculum_id, row_id, semester):
-    # ✅ ดึงแถว PLO ที่เกี่ยวข้องกับ curriculum
-    plo_row = get_object_or_404(CreditRow, id=row_id, curriculum_id=curriculum_id)
+    # ✅ ตรวจสอบโหมด (edit หรือ view)
+    mode = request.GET.get('mode') or request.session.get('access_mode', 'view')
+    db = 'real' if mode == 'edit' else 'default'
+
+    # ✅ ดึงแถว PLO จากฐานข้อมูลที่ถูกต้อง
+    plo_row = get_object_or_404(CreditRow.objects.using(db), id=row_id, curriculum_id=curriculum_id)
 
     # ✅ ตัดชื่อ PLO เช่น "PLO1: ด้านการคิด" → "PLO1"
     plo_label = plo_row.name.split()[0] if plo_row.name else ''
 
     # ✅ ดึงเฉพาะรายวิชาที่อยู่ใน curriculum นี้
-    matching_courses = Course.objects.filter(
+    matching_courses = Course.objects.using(db).filter(
         curriculum_id=curriculum_id,
         semester=semester,
         plo=plo_label,
         credit_row__row_type__in=['general', 'core']
-    ) | Course.objects.filter(
+    ) | Course.objects.using(db).filter(
         curriculum_id=curriculum_id,
         semester=semester,
         plo=plo_label,
