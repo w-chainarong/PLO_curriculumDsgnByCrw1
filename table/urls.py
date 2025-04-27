@@ -20,7 +20,11 @@ urlpatterns = [
     # สำหรับ admin sync
     path('sync-db/', admin_views.sync_real_to_example, name='sync_real_to_example'),
 
-    # ✅ ใหม่: สำหรับปุ่ม Backup และ Restore ในแต่ละหลักสูตร
+    # ✅ สำหรับปุ่ม Backup และ Restore
     path('curriculum/<int:curriculum_id>/backup/', views.sync_curriculum_real_to_example, name='sync_curriculum_real_to_example'),
     path('curriculum/<int:curriculum_id>/restore/', views.sync_curriculum_example_to_real, name='sync_curriculum_example_to_real'),
+
+    # ✅ ใหม่: สำหรับดาวน์โหลด database
+    path('download-db/all/', views.download_all_databases, name='download_all_databases'),  # ✅ ต้องวาง all ไว้ก่อน
+    path('download-db/<str:db_name>/', views.download_database, name='download_database'),  # ✅ แล้วค่อย db_name
 ]

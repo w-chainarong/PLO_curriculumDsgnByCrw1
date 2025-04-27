@@ -3,6 +3,10 @@ from .models import Curriculum, CreditRow, Course
 from django.db.models import Sum
 import re
 from django.contrib import messages  # 🔥 เพิ่มไว้ด้านบนด้วยนะครับ (import messages)
+from django.http import FileResponse, HttpResponse, HttpResponseNotFound
+import zipfile
+import os
+import io
 
 
 headers = [
@@ -365,3 +369,30 @@ def sync_curriculum_example_to_real(request, curriculum_id):
 
     messages.success(request, "✅ ดึงข้อมูลตัวอย่างกลับไปยังฐานหลักเรียบร้อยแล้ว (เขียนทับข้อมูลเก่า)")
     return redirect('credit_table', curriculum_id=curriculum_id)
+
+def download_all_databases(request):
+    filenames = ['real.sqlite3', 'example.sqlite3']
+    missing_files = [f for f in filenames if not os.path.exists(f)]
+
+    if missing_files:
+        return HttpResponseNotFound(f"Missing files: {', '.join(missing_files)}")
+
+    # ✅ รวมไฟล์เป็น zip ใน memory
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+        for filename in filenames:
+            zip_file.write(filename)
+
+    zip_buffer.seek(0)
+
+    return FileResponse(zip_buffer, as_attachment=True, filename='all_databases.zip')
+
+def download_database(request, db_name):
+    if db_name not in ['real', 'example']:
+        return HttpResponse("Invalid database name", status=400)
+
+    file_path = f'{db_name}.sqlite3'  # ไฟล์ real.sqlite3 กับ example.sqlite3 อยู่ตรง root เดียวกับ manage.py
+    if not os.path.exists(file_path):
+        return HttpResponse("File not found", status=404)
+
+    return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=f'{db_name}.sqlite3')
