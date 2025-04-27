@@ -236,6 +236,19 @@
 
 </head>
 <body>
+    <!-- 🔵 ปุ่ม Backup/Restore เฉพาะโหมด edit -->
+    {% if access_mode == 'edit' %}
+    <div style="text-align: right; margin-bottom: 10px;">
+        <form method="POST" action="{% url 'sync_curriculum_real_to_example' curriculum_id=curriculum.id %}" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="save-btn" onclick="return confirm('คุณต้องการสำรองข้อมูลไปยังฐานตัวอย่างหรือไม่?')">🔄 Backup</button>
+        </form>
+        <form method="POST" action="{% url 'sync_curriculum_example_to_real' curriculum_id=curriculum.id %}" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="reset-btn" onclick="return confirm('ข้อมูลปัจจุบันจะถูกเขียนทับ! คุณต้องการดึงข้อมูลตัวอย่างกลับมาหรือไม่?')">♻️ Restore</button>
+        </form>
+    </div>
+    {% endif %}
     <p style="margin: 10px 0;">
         <a href="{% url 'select_curriculum' %}" style="text-decoration: none; font-size: 16px;">⬅️ กลับไปเลือกหลักสูตร</a>
     </p>
@@ -391,14 +404,18 @@
         </tr>                           
         </tbody>
     </table>
+    {% if access_mode == 'edit' %}
     <div style="margin-top: 16px;">
         <button type="submit" class="save-btn">📂 บันทึกการเปลี่ยนแปลง</button>
     </div>
+    {% endif %}
 </form>
+{% if access_mode == 'edit' %}
 <form method="POST" action="{% url 'reset_credit_table' curriculum_id=curriculum.id %}" style="margin-top: 10px;" onsubmit="return confirm('คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตตาราง? การดำเนินการนี้จะลบข้อมูลทั้งหมด!')">
     {% csrf_token %}
     <button type="submit" class="reset-btn">♻️ รีเซ็ตตาราง</button>
 </form>
+{% endif %}
 <script>
     function resetTextareaSize(button) {
     let parent = button.closest('td');  // 🔥 หา td ที่ใกล้ที่สุดที่เป็นพ่อของปุ่ม

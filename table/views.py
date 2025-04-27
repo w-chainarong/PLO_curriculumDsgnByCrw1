@@ -2,6 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from .models import Curriculum, CreditRow, Course
 from django.db.models import Sum
 import re
+from django.contrib import messages  # 🔥 เพิ่มไว้ด้านบนด้วยนะครับ (import messages)
+
 
 headers = [
     'ปีที่ 1/1', 'ปีที่ 1/2', 'ปีที่ 2/1', 'ปีที่ 2/2',
@@ -173,7 +175,9 @@ def credit_table(request, curriculum_id):
         'plo_course_totals': plo_course_totals,
         'plo_semester_totals': plo_semester_totals,
         'plo_percentages': plo_percentages,
+        'access_mode': mode,    # ✅ เพิ่มบรรทัดนี้
     })
+
 
 def reset_credit_table(request, curriculum_id):
     mode = request.session.get('access_mode', 'view')
@@ -256,20 +260,108 @@ def reset_credit_table(request, curriculum_id):
         )
 
         return redirect('credit_table', curriculum_id=curriculum.id)
+    
+def sync_curriculum_real_to_example(request, curriculum_id):
+    if request.session.get('access_mode') != 'edit':
+        messages.error(request, "🚫 ต้องอยู่ในโหมดแก้ไขเท่านั้นจึงจะสำรองข้อมูลได้")
+        return redirect('credit_table', curriculum_id=curriculum_id)
 
-from django.http import FileResponse, Http404
-import os
+    curriculum_real = get_object_or_404(Curriculum.objects.using('real'), id=curriculum_id)
 
-def download_database(request, db_name):
-    allowed = ['real.sqlite3', 'example.sqlite3']
-    if db_name not in allowed:
-        raise Http404("ไม่พบไฟล์ที่ร้องขอ")
+    Curriculum.objects.using('default').filter(id=curriculum_id).delete()
+    CreditRow.objects.using('default').filter(curriculum_id=curriculum_id).delete()
+    Course.objects.using('default').filter(curriculum_id=curriculum_id).delete()
 
-    # ดึงตำแหน่งไฟล์ฐานข้อมูลจากโฟลเดอร์โปรเจกต์หลัก
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    file_path = os.path.join(base_dir, db_name)
+    Curriculum.objects.using('default').create(
+        id=curriculum_real.id,
+        name=curriculum_real.name,
+        password=curriculum_real.password
+    )
 
-    if os.path.exists(file_path):
-        return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=db_name)
-    else:
-        raise Http404("ไม่พบไฟล์ที่ร้องขอ")
+    real_to_default_creditrow = {}
+    for row in CreditRow.objects.using('real').filter(curriculum_id=curriculum_id):
+        new_row = CreditRow.objects.using('default').create(
+            curriculum_id=row.curriculum_id,
+            name=row.name,
+            row_type=row.row_type,
+            credits_sem1=row.credits_sem1,
+            credits_sem2=row.credits_sem2,
+            credits_sem3=row.credits_sem3,
+            credits_sem4=row.credits_sem4,
+            credits_sem5=row.credits_sem5,
+            credits_sem6=row.credits_sem6,
+            credits_sem7=row.credits_sem7,
+            credits_sem8=row.credits_sem8
+        )
+        real_to_default_creditrow[row.id] = new_row
+
+    for course in Course.objects.using('real').filter(curriculum_id=curriculum_id):
+        new_credit_row = real_to_default_creditrow.get(course.credit_row.id) if course.credit_row else None
+        Course.objects.using('default').create(
+            curriculum_id=course.curriculum_id,
+            course_code=course.course_code,
+            course_name=course.course_name,
+            credits=course.credits,
+            semester=course.semester,
+            plo=course.plo,
+            category=course.category,
+            credit_row=new_credit_row
+        )
+
+    messages.success(request, "✅ สำรองข้อมูลหลักสูตรไปยังฐานตัวอย่างเรียบร้อยแล้ว")
+    return redirect('credit_table', curriculum_id=curriculum_id)
+
+
+def sync_curriculum_example_to_real(request, curriculum_id):
+    if request.session.get('access_mode') != 'edit':
+        messages.error(request, "🚫 ต้องอยู่ในโหมดแก้ไขเท่านั้นจึงจะดึงข้อมูลกลับได้")
+        return redirect('credit_table', curriculum_id=curriculum_id)
+
+    curriculum_example = get_object_or_404(Curriculum.objects.using('default'), id=curriculum_id)
+
+    # ลบข้อมูลเก่าในฐาน real
+    Curriculum.objects.using('real').filter(id=curriculum_id).delete()
+    CreditRow.objects.using('real').filter(curriculum_id=curriculum_id).delete()
+    Course.objects.using('real').filter(curriculum_id=curriculum_id).delete()
+
+    # ดึง Curriculum
+    Curriculum.objects.using('real').create(
+        id=curriculum_example.id,
+        name=curriculum_example.name,
+        password=curriculum_example.password
+    )
+
+    # ดึง CreditRow และเก็บ mapping
+    example_to_real_creditrow = {}
+    for row in CreditRow.objects.using('default').filter(curriculum_id=curriculum_id):
+        new_row = CreditRow.objects.using('real').create(
+            curriculum_id=row.curriculum_id,
+            name=row.name,
+            row_type=row.row_type,
+            credits_sem1=row.credits_sem1,
+            credits_sem2=row.credits_sem2,
+            credits_sem3=row.credits_sem3,
+            credits_sem4=row.credits_sem4,
+            credits_sem5=row.credits_sem5,
+            credits_sem6=row.credits_sem6,
+            credits_sem7=row.credits_sem7,
+            credits_sem8=row.credits_sem8,
+        )
+        example_to_real_creditrow[row.id] = new_row
+
+    # ดึง Course โดยใช้ CreditRow ใหม่
+    for course in Course.objects.using('default').filter(curriculum_id=curriculum_id):
+        new_credit_row = example_to_real_creditrow.get(course.credit_row.id) if course.credit_row else None
+        Course.objects.using('real').create(
+            curriculum_id=course.curriculum_id,
+            course_code=course.course_code,
+            course_name=course.course_name,
+            credits=course.credits,
+            semester=course.semester,
+            plo=course.plo,
+            category=course.category,
+            credit_row=new_credit_row
+        )
+
+    messages.success(request, "✅ ดึงข้อมูลตัวอย่างกลับไปยังฐานหลักเรียบร้อยแล้ว (เขียนทับข้อมูลเก่า)")
+    return redirect('credit_table', curriculum_id=curriculum_id)
