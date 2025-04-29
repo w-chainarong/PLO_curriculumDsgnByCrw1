@@ -392,7 +392,12 @@
         <tr style="background-color: #eef;">
             <td colspan="2"><strong>รวมหน่วยกิตหมวด PLOs</strong></td>
             {% for sem in headers|length|to_range %}
-                <td><input type="number" value="{{ plo_semester_totals|get_item:sem }}" readonly></td>
+            <td>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                    <a href="{% url 'ylo_studyplan_view' curriculum_id=curriculum.id semester=sem %}?mode={{ access_mode }}" target="_blank" class="no-underline">📋</a>
+                    <input type="number" value="{{ plo_semester_totals|get_item:sem }}" readonly style="width: 40px; text-align: center;">
+                </div>
+            </td>
             {% endfor %}
             <td class="total-cell">
                 {% with total_plo=plo_semester_totals.values|sum_list %}
@@ -429,22 +434,22 @@
     }
     // 🔒 ล็อกไม่ให้แก้ prefix PLOn:
     function lockPLOPrefix(textarea) {
-        const row = textarea.closest('tr');
-        const label = row?.querySelector('.plo-label');
-        if (!label) return;
+    const row = textarea.closest('tr');
+    const label = row?.querySelector('.plo-label');
+    if (!label) return;
 
-        const expectedPrefix = label.textContent + ':';
-        const lines = textarea.value.split('\n');
+    const expectedPrefix = label.textContent + ':';
+    const lines = textarea.value.split('\n');
 
-        // ✅ ใช้ regex เพื่อแยก prefix เดิมออก
-        const prefixRegex = /^PLO\s*\d+\s*:?\s*/;  // รองรับทุกเวอร์ชันของ prefix
-        const suffix = lines[0].replace(prefixRegex, '').trim();
+    // ✅ ใช้ regex เพื่อแยก prefix เดิมออก
+    const prefixRegex = /^PLO\s*\d+\s*:?\s*/;
+    const suffix = lines[0].replace(prefixRegex, '');
 
-        // ✅ ใส่ expectedPrefix + ช่องว่างเสมอ
-        lines[0] = `${expectedPrefix} ${suffix}`.trim();
-        textarea.value = lines.join('\n');
+    // ✅ รวม prefix ใหม่กับ suffix (ลบช่องว่างต้น แต่เก็บท้าย)
+    lines[0] = `${expectedPrefix} ${suffix.replace(/^\s+/, '')}`;
+    textarea.value = lines.join('\n');
     }
-
+    
     // ✅ อัปเดต label และ prefix
     function updatePLOLabels() {
         const rows = document.querySelectorAll('tr[id^="plo-row-"]');

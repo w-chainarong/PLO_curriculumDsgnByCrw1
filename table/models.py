@@ -54,3 +54,12 @@ class Course(models.Model):
 
     def __str__(self):
         return f'{self.course_code} - {self.course_name}'
+
+class YLOPerPLOSemester(models.Model):
+    curriculum = models.ForeignKey('Curriculum', on_delete=models.CASCADE)
+    plo = models.CharField(max_length=50)  # เช่น "PLO1", "PLO2"
+    semester = models.PositiveSmallIntegerField()  # 1–8
+    summary_text = models.TextField(blank=True, null=True)  # ✅ Rich Text สำหรับสรุป YLO
+
+    def __str__(self):
+        return f"YLO Summary {self.plo} - Sem {self.semester}"

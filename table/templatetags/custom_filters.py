@@ -39,3 +39,10 @@ def div(value, arg):
         return float(value) / float(arg) if float(arg) != 0 else 0
     except (ValueError, ZeroDivisionError):
         return 0
+
+@register.filter
+def map(value, attr_name):
+    try:
+        return [getattr(obj, attr_name, 0) for obj in value]
+    except:
+        return []

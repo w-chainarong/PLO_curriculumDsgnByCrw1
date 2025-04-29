@@ -7,6 +7,7 @@ from django.http import FileResponse, HttpResponse, HttpResponseNotFound
 import zipfile
 import os
 import io
+from .models import Curriculum, CreditRow, Course, YLOPerPLOSemester
 
 
 headers = [
@@ -272,16 +273,20 @@ def sync_curriculum_real_to_example(request, curriculum_id):
 
     curriculum_real = get_object_or_404(Curriculum.objects.using('real'), id=curriculum_id)
 
+    # ✅ ลบข้อมูลใน example (default) ก่อน
     Curriculum.objects.using('default').filter(id=curriculum_id).delete()
     CreditRow.objects.using('default').filter(curriculum_id=curriculum_id).delete()
     Course.objects.using('default').filter(curriculum_id=curriculum_id).delete()
+    YLOPerPLOSemester.objects.using('default').filter(curriculum_id=curriculum_id).delete()  # ✅ เพิ่มลบ YLO ด้วย
 
+    # ✅ คัดลอก Curriculum
     Curriculum.objects.using('default').create(
         id=curriculum_real.id,
         name=curriculum_real.name,
         password=curriculum_real.password
     )
 
+    # ✅ คัดลอก CreditRow
     real_to_default_creditrow = {}
     for row in CreditRow.objects.using('real').filter(curriculum_id=curriculum_id):
         new_row = CreditRow.objects.using('default').create(
@@ -299,6 +304,7 @@ def sync_curriculum_real_to_example(request, curriculum_id):
         )
         real_to_default_creditrow[row.id] = new_row
 
+    # ✅ คัดลอก Course
     for course in Course.objects.using('real').filter(curriculum_id=curriculum_id):
         new_credit_row = real_to_default_creditrow.get(course.credit_row.id) if course.credit_row else None
         Course.objects.using('default').create(
@@ -310,6 +316,15 @@ def sync_curriculum_real_to_example(request, curriculum_id):
             plo=course.plo,
             category=course.category,
             credit_row=new_credit_row
+        )
+
+    # ✅ คัดลอก YLOPerPLOSemester
+    for ylo in YLOPerPLOSemester.objects.using('real').filter(curriculum_id=curriculum_id):
+        YLOPerPLOSemester.objects.using('default').create(
+            curriculum_id=ylo.curriculum_id,
+            plo=ylo.plo,
+            semester=ylo.semester,
+            summary_text=ylo.summary_text
         )
 
     messages.success(request, "✅ สำรองข้อมูลหลักสูตรไปยังฐานตัวอย่างเรียบร้อยแล้ว")

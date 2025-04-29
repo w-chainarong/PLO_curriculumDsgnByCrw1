@@ -1,0 +1,136 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ตารางแผนการเรียนตาม YLO ของภาคการศึกษา {{ semester_str }}</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+        th, td {
+            border: 1px solid #444;
+            padding: 8px;
+            text-align: center;
+            vertical-align: top;
+        }
+        th {
+            background-color: #eee;
+        }
+        .readonly-cell {
+            background-color: #f0f0f0;
+        }
+        input[type="text"] {
+            width: 95%;
+            padding: 4px;
+            box-sizing: border-box;
+        }
+        .header-title {
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .btn-save {
+            margin-top: 20px;
+            padding: 8px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            font-weight: bold;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .btn-close {
+            margin-top: 20px;
+            padding: 8px 20px;
+            background-color: #e53935;
+            color: white;
+            border: none;
+            font-weight: bold;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .ylo-section {
+            margin-top: 30px;
+            padding: 10px;
+            background: #f9f9f9;
+            border: 1px solid #ccc;
+        }
+        .ylo-section p {
+            text-align: left;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header-title">
+    ตารางแผนการเรียนตาม YLO ของภาคการศึกษา {{ semester_str }}
+</div>
+
+<form method="POST" action="{% url 'save_ylo_studyplan' curriculum_id=curriculum_id semester=semester %}">
+    {% csrf_token %}
+    <table>
+        <thead>
+            <tr>
+                <th>รหัสวิชา</th>
+                <th>ชื่อรายวิชา</th>
+                <th>หน่วยกิต</th>
+                <th>Knowledge</th>
+                <th>Skills</th>
+                <th>Ethics</th>
+                <th>Character</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for course in courses %}
+            <tr>
+                <td class="readonly-cell">{{ course.course_code }}</td>
+                <td class="readonly-cell">{{ course.course_name }}</td>
+                <td class="readonly-cell">{{ course.credits }}</td>
+                <td><input type="text" name="knowledge_{{ course.id }}" value="{{ course.knowledge|default_if_none:'' }}"></td>
+                <td><input type="text" name="skills_{{ course.id }}" value="{{ course.skills|default_if_none:'' }}"></td>
+                <td><input type="text" name="ethics_{{ course.id }}" value="{{ course.ethics|default_if_none:'' }}"></td>
+                <td><input type="text" name="character_{{ course.id }}" value="{{ course.character|default_if_none:'' }}"></td>
+            </tr>
+            {% endfor %}
+
+            <!-- ✅ แถวรวมหน่วยกิต -->
+            <tr style="background-color: #eef; font-weight: bold;">
+                <td colspan="2" style="text-align: right;">รวมหน่วยกิต</td>
+                <td>
+                    {{ courses|map:'credits'|sum_list }}
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    {% if access_mode == 'edit' %}
+    <div style="text-align: center;">
+        <button type="submit" class="btn-save">💾 บันทึกข้อมูล</button>
+    </div>
+    {% endif %}
+</form>
+
+<!-- 🔽 ส่วนแสดงรายการ YLO -->
+<div class="ylo-section">
+    <h3>รายการ YLO ในภาคการศึกษานี้</h3>
+    {% for ylo in ylo_list %}
+        <p><strong>{{ ylo.code }}:</strong> {{ ylo.summary_text|default:"<i>ไม่มีข้อความ YLO</i>"|safe }}</p>
+    {% empty %}
+        <p><i>ไม่มีข้อมูล YLO ในภาคการศึกษานี้</i></p>
+    {% endfor %}
+</div>
+
+<div style="text-align: center;">
+    <button type="button" class="btn-close" onclick="window.close()">🔙 ปิดหน้าต่างนี้</button>
+</div>
+
+</body>
+</html>
