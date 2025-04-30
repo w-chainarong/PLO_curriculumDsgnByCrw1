@@ -24,14 +24,12 @@ urlpatterns = [
 
     # ✅ ตารางแผนการเรียนตาม YLO
     path('curriculum/<int:curriculum_id>/ylo-studyplan/<int:semester>/', views_ylo.ylo_studyplan_view, name='ylo_studyplan_view'),
-
-    # ✅ บันทึกแผนการเรียนตาม YLO
     path('curriculum/<int:curriculum_id>/ylo-studyplan/<int:semester>/save/', views_ylo.save_ylo_studyplan, name='save_ylo_studyplan'),
 
     # ✅ ฟังก์ชัน Sync ข้อมูลระหว่างฐาน real ↔ example
-    path('sync-db/', admin_views.sync_real_to_example, name='sync_real_to_example'),
-    path('curriculum/<int:curriculum_id>/backup/', views.sync_curriculum_real_to_example, name='sync_curriculum_real_to_example'),
-    path('curriculum/<int:curriculum_id>/restore/', views.sync_curriculum_example_to_real, name='sync_curriculum_example_to_real'),
+    path('sync-db/', admin_views.sync_real_to_example, name='sync_real_to_example'),  # 🔁 ทั้งฐาน real → example
+    path('curriculum/<int:curriculum_id>/backup/', views.sync_curriculum_real_to_example, name='sync_curriculum_real_to_example'),  # 🔁 หลักสูตรเดียว real → example (user page)
+    path('curriculum/<int:curriculum_id>/restore/', admin_views.sync_curriculum_example_to_real, name='sync_curriculum_example_to_real'),  # ✅ หลักสูตรเดียว example → real (admin page)
 
     # ✅ ปุ่มดาวน์โหลดฐานข้อมูล
     path('download-db/all/', views.download_all_databases, name='download_all_databases'),
