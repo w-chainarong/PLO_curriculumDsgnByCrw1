@@ -1,5 +1,4 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Curriculum, CreditRow, Course
 from django.db.models import Sum
 import re
 from django.contrib import messages  # 🔥 เพิ่มไว้ด้านบนด้วยนะครับ (import messages)
@@ -7,7 +6,8 @@ from django.http import FileResponse, HttpResponse, HttpResponseNotFound
 import zipfile
 import os
 import io
-from .models import Curriculum, CreditRow, Course, YLOPerPLOSemester
+from .models import Curriculum, CreditRow, Course, YLOPerPLOSemester, KSECItem
+from .models import CLO, CLOSummary  # ด้านบนของไฟล์ต้อง import ด้วย
 
 
 headers = [
@@ -271,19 +271,28 @@ def sync_curriculum_real_to_example(request, curriculum_id):
         messages.error(request, "🚫 ต้องอยู่ในโหมดแก้ไขเท่านั้นจึงจะสำรองข้อมูลได้")
         return redirect('credit_table', curriculum_id=curriculum_id)
 
-    curriculum_real = get_object_or_404(Curriculum.objects.using('real'), id=curriculum_id)
+    # ✅ ตรวจสอบว่ามี curriculum จริงในฐาน real หรือไม่
+    curriculum_real = Curriculum.objects.using('real').filter(id=curriculum_id).first()
+    if not curriculum_real:
+        messages.error(request, f"❌ ไม่พบหลักสูตร ID={curriculum_id} ในฐาน real")
+        return redirect('credit_table', curriculum_id=curriculum_id)
 
-    # ✅ ลบข้อมูลใน example (default) ก่อน
-    Curriculum.objects.using('default').filter(id=curriculum_id).delete()
+    # ✅ ลบข้อมูลลูกทั้งหมดใน example
     CreditRow.objects.using('default').filter(curriculum_id=curriculum_id).delete()
     Course.objects.using('default').filter(curriculum_id=curriculum_id).delete()
-    YLOPerPLOSemester.objects.using('default').filter(curriculum_id=curriculum_id).delete()  # ✅ เพิ่มลบ YLO ด้วย
+    YLOPerPLOSemester.objects.using('default').filter(curriculum_id=curriculum_id).delete()
+    KSECItem.objects.using('default').filter(curriculum_id=curriculum_id).delete()
+    CLO.objects.using('default').filter(course__curriculum_id=curriculum_id).delete()
+    CLOSummary.objects.using('default').filter(course__curriculum_id=curriculum_id).delete()
 
-    # ✅ คัดลอก Curriculum
-    Curriculum.objects.using('default').create(
+    # ✅ คัดลอกหรืออัปเดต Curriculum (ไม่ลบ)
+    Curriculum.objects.using('default').update_or_create(
         id=curriculum_real.id,
-        name=curriculum_real.name,
-        password=curriculum_real.password
+        defaults={
+            'name': curriculum_real.name,
+            'password': curriculum_real.password,
+            'clo_edit_password': curriculum_real.clo_edit_password
+        }
     )
 
     # ✅ คัดลอก CreditRow
@@ -304,10 +313,13 @@ def sync_curriculum_real_to_example(request, curriculum_id):
         )
         real_to_default_creditrow[row.id] = new_row
 
-    # ✅ คัดลอก Course
+    # ✅ คัดลอก Course โดยใช้ ID เดิม
+    real_to_default_course = {}
     for course in Course.objects.using('real').filter(curriculum_id=curriculum_id):
         new_credit_row = real_to_default_creditrow.get(course.credit_row.id) if course.credit_row else None
-        Course.objects.using('default').create(
+
+        new_course = Course(
+            id=course.id,  # 🔥 ใช้ ID เดิม
             curriculum_id=course.curriculum_id,
             course_code=course.course_code,
             course_name=course.course_name,
@@ -315,8 +327,15 @@ def sync_curriculum_real_to_example(request, curriculum_id):
             semester=course.semester,
             plo=course.plo,
             category=course.category,
-            credit_row=new_credit_row
+            credit_row=new_credit_row,
+            knowledge=course.knowledge,
+            skills=course.skills,
+            ethics=course.ethics,
+            character=course.character,
+            description=course.description
         )
+        new_course.save(using='default', force_insert=True)
+        real_to_default_course[course.id] = new_course
 
     # ✅ คัดลอก YLOPerPLOSemester
     for ylo in YLOPerPLOSemester.objects.using('real').filter(curriculum_id=curriculum_id):
@@ -326,6 +345,48 @@ def sync_curriculum_real_to_example(request, curriculum_id):
             semester=ylo.semester,
             summary_text=ylo.summary_text
         )
+
+    # ✅ คัดลอก KSECItem
+    for item in KSECItem.objects.using('real').filter(curriculum_id=curriculum_id):
+        KSECItem.objects.using('default').create(
+            curriculum_id=item.curriculum_id,
+            semester=0,  # ✅ ใช้ 0 เสมอ
+            type=item.type,
+            category_type=item.category_type,
+            description=item.description,
+            sort_order=item.sort_order
+        )
+
+    # ✅ คัดลอก CLO และ CLOSummary
+    for course in Course.objects.using('real').filter(curriculum_id=curriculum_id):
+        new_course = real_to_default_course.get(course.id)
+        if not new_course:
+            continue
+
+        # ✅ คัดลอก CLO
+        for clo in CLO.objects.using('real').filter(course=course):
+            CLO.objects.using('default').create(
+                course=new_course,
+                index=clo.index,
+                clo=clo.clo,
+                bloom=clo.bloom,
+                k=clo.k,
+                s=clo.s,
+                e=clo.e,
+                c=clo.c
+            )
+
+        # ✅ คัดลอก CLOSummary
+        summary = CLOSummary.objects.using('real').filter(course=course).first()
+        if summary:
+            CLOSummary.objects.using('default').create(
+                course=new_course,
+                bloom_score=summary.bloom_score,
+                k_percent=summary.k_percent,
+                s_percent=summary.s_percent,
+                e_percent=summary.e_percent,
+                c_percent=summary.c_percent
+            )
 
     messages.success(request, "✅ สำรองข้อมูลหลักสูตรไปยังฐานตัวอย่างเรียบร้อยแล้ว")
     return redirect('credit_table', curriculum_id=curriculum_id)
@@ -338,22 +399,28 @@ def sync_curriculum_example_to_real(request, curriculum_id):
 
     curriculum_example = get_object_or_404(Curriculum.objects.using('default'), id=curriculum_id)
 
-    # ลบข้อมูลเก่าในฐาน real
-    Curriculum.objects.using('real').filter(id=curriculum_id).delete()
+    # ✅ ลบข้อมูลเก่าในฐาน real
+    CLO.objects.using('real').filter(course__curriculum_id=curriculum_id).delete()
+    CLOSummary.objects.using('real').filter(course__curriculum_id=curriculum_id).delete()
     CreditRow.objects.using('real').filter(curriculum_id=curriculum_id).delete()
     Course.objects.using('real').filter(curriculum_id=curriculum_id).delete()
+    YLOPerPLOSemester.objects.using('real').filter(curriculum_id=curriculum_id).delete()
+    KSECItem.objects.using('real').filter(curriculum_id=curriculum_id).delete()
+    Curriculum.objects.using('real').filter(id=curriculum_id).delete()
 
-    # ดึง Curriculum
+    # ✅ คัดลอก Curriculum
     Curriculum.objects.using('real').create(
         id=curriculum_example.id,
         name=curriculum_example.name,
-        password=curriculum_example.password
+        password=curriculum_example.password,
+        clo_edit_password=curriculum_example.clo_edit_password
     )
 
-    # ดึง CreditRow และเก็บ mapping
+    # ✅ คัดลอก CreditRow และเก็บ mapping id
     example_to_real_creditrow = {}
     for row in CreditRow.objects.using('default').filter(curriculum_id=curriculum_id):
         new_row = CreditRow.objects.using('real').create(
+            id=row.id,  # 🔥 ใช้ ID เดิม
             curriculum_id=row.curriculum_id,
             name=row.name,
             row_type=row.row_type,
@@ -364,14 +431,17 @@ def sync_curriculum_example_to_real(request, curriculum_id):
             credits_sem5=row.credits_sem5,
             credits_sem6=row.credits_sem6,
             credits_sem7=row.credits_sem7,
-            credits_sem8=row.credits_sem8,
+            credits_sem8=row.credits_sem8
         )
         example_to_real_creditrow[row.id] = new_row
 
-    # ดึง Course โดยใช้ CreditRow ใหม่
+    # ✅ คัดลอก Course โดยใช้ ID เดิม
+    example_to_real_course = {}
     for course in Course.objects.using('default').filter(curriculum_id=curriculum_id):
         new_credit_row = example_to_real_creditrow.get(course.credit_row.id) if course.credit_row else None
-        Course.objects.using('real').create(
+
+        new_course = Course(
+            id=course.id,  # 🔥 ใช้ ID เดิม
             curriculum_id=course.curriculum_id,
             course_code=course.course_code,
             course_name=course.course_name,
@@ -379,11 +449,68 @@ def sync_curriculum_example_to_real(request, curriculum_id):
             semester=course.semester,
             plo=course.plo,
             category=course.category,
-            credit_row=new_credit_row
+            credit_row=new_credit_row,
+            knowledge=course.knowledge,
+            skills=course.skills,
+            ethics=course.ethics,
+            character=course.character,
+            description=course.description
         )
+        new_course.save(using='real', force_insert=True)
+        example_to_real_course[course.id] = new_course
+
+    # ✅ คัดลอก YLOPerPLOSemester
+    for ylo in YLOPerPLOSemester.objects.using('default').filter(curriculum_id=curriculum_id):
+        YLOPerPLOSemester.objects.using('real').create(
+            curriculum_id=ylo.curriculum_id,
+            plo=ylo.plo,
+            semester=ylo.semester,
+            summary_text=ylo.summary_text
+        )
+
+    # ✅ คัดลอก KSECItem
+    for item in KSECItem.objects.using('default').filter(curriculum_id=curriculum_id):
+        KSECItem.objects.using('real').create(
+            curriculum_id=item.curriculum_id,
+            semester=0,
+            type=item.type,
+            category_type=item.category_type,
+            description=item.description,
+            sort_order=item.sort_order
+        )
+
+    # ✅ คัดลอก CLO และ CLOSummary
+    for course in Course.objects.using('default').filter(curriculum_id=curriculum_id):
+        new_course = example_to_real_course.get(course.id)
+        if not new_course:
+            continue
+
+        for clo in CLO.objects.using('default').filter(course=course):
+            CLO.objects.using('real').create(
+                course=new_course,
+                index=clo.index,
+                clo=clo.clo,
+                bloom=clo.bloom,
+                k=clo.k,
+                s=clo.s,
+                e=clo.e,
+                c=clo.c
+            )
+
+        summary = CLOSummary.objects.using('default').filter(course=course).first()
+        if summary:
+            CLOSummary.objects.using('real').create(
+                course=new_course,
+                bloom_score=summary.bloom_score,
+                k_percent=summary.k_percent,
+                s_percent=summary.s_percent,
+                e_percent=summary.e_percent,
+                c_percent=summary.c_percent
+            )
 
     messages.success(request, "✅ ดึงข้อมูลตัวอย่างกลับไปยังฐานหลักเรียบร้อยแล้ว (เขียนทับข้อมูลเก่า)")
     return redirect('credit_table', curriculum_id=curriculum_id)
+
 
 def download_all_databases(request):
     filenames = ['real.sqlite3', 'example.sqlite3']

@@ -86,7 +86,6 @@
                 window.close();
             };
 
-            // เตือนเมื่อจะออกจากหน้า (แต่ยกเลิกได้ถ้า submit)
             const saveForm = document.querySelector('form[action*="save"]');
             if (saveForm) {
                 saveForm.addEventListener('submit', function () {
@@ -101,9 +100,36 @@
     </script>
 </head>
 <body>
+    {% if messages %}
+    <script>
+        {% for message in messages %}
+            alert("{{ message|escapejs }}");
+        {% endfor %}
+    </script>
+    {% endif %}
     {% with headers_list="ปีที่ 1/1,ปีที่ 1/2,ปีที่ 2/1,ปีที่ 2/2,ปีที่ 3/1,ปีที่ 3/2,ปีที่ 4/1,ปีที่ 4/2"|split:"," %}
         <h2 style="text-align: center;">รายการรายวิชาใน {{ headers_list|index:semester }}</h2>
         <h3 style="text-align: center;">จากหมวดวิชา: {{ row.name }}</h3>
+
+        {% if plo_descriptions %}
+        <div class="plo-summary" style="text-align: left; margin: 16px;">
+            <button type="button" onclick="togglePLOs()" style="margin-bottom: 8px;">📘 แสดง/ซ่อนรายการ PLO</button>
+            <div id="plo-detail" style="display: none; padding-left: 16px;">
+                <strong>รายการ PLO ทั้งหมดของหลักสูตร:</strong>
+                <ul>
+                    {% for label, desc in plo_descriptions.items %}
+                        <li><strong>{{ label }}</strong>: {{ desc|cut:label|cut:" "|cut:"　" }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <script>
+            function togglePLOs() {
+                const box = document.getElementById("plo-detail");
+                box.style.display = box.style.display === "none" ? "block" : "none";
+            }
+        </script>
+        {% endif %}
     {% endwith %}
     
     {% if not readonly %}
@@ -187,5 +213,5 @@
         <div style="margin-top: 20px; text-align: center;">
             <button type="button" class="close-btn" onclick="closeWindow()">🔙 ปิดหน้าต่างนี้</button>
         </div>
-    </body>
+</body>
 </html>

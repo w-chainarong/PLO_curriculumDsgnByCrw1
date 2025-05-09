@@ -1,15 +1,27 @@
 from django.db import models
 
-    
 class Curriculum(models.Model):
     name = models.CharField(max_length=255)
-    password = models.CharField(max_length=100, blank=True)  # ✅ เพิ่มรหัสผ่าน
+    password = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="รหัสผ่านสำหรับปลดล็อกโหมดแก้ไขของตารางหลัก"
+    )
+    clo_edit_password = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="รหัสผ่านสำหรับปลดล็อกหน้า CLO-KSEC Mapping"
+    )
 
     def __str__(self):
         return self.name
 
+
 class CreditRow(models.Model):
-    curriculum = models.ForeignKey(Curriculum, on_delete=models.CASCADE)  # ✅ เพิ่ม
+    curriculum = models.ForeignKey(Curriculum, on_delete=models.CASCADE)
+
     ROW_TYPES = [
         ('general', 'General Education'),
         ('core', 'Core Education'),
@@ -40,26 +52,89 @@ class CreditRow(models.Model):
     def __str__(self):
         return f"{self.name} [{self.row_type}]"
 
+
 class Course(models.Model):
-    curriculum = models.ForeignKey(Curriculum, on_delete=models.CASCADE)  # ✅ เพิ่ม
+    curriculum = models.ForeignKey(Curriculum, on_delete=models.CASCADE)
     credit_row = models.ForeignKey(CreditRow, on_delete=models.CASCADE, related_name='courses', null=True, blank=True)
     category = models.CharField(max_length=50, blank=True, null=True)
     semester = models.PositiveSmallIntegerField(
-        choices=[(i + 1, f'ปีที่ {i//2 + 1}/{i%2 + 1}') for i in range(8)]
+        choices=[(i + 1, f'ปีที่ {i // 2 + 1}/{i % 2 + 1}') for i in range(8)]
     )
     course_code = models.CharField(max_length=20)
     course_name = models.CharField(max_length=255)
     credits = models.IntegerField()
     plo = models.CharField(max_length=10)
 
+    # ✅ เพิ่มตรงนี้
+    description = models.TextField(blank=True, null=True)
+
+    knowledge = models.TextField(blank=True, null=True)
+    skills = models.TextField(blank=True, null=True)
+    ethics = models.TextField(blank=True, null=True)
+    character = models.TextField(blank=True, null=True)
+
     def __str__(self):
         return f'{self.course_code} - {self.course_name}'
 
+
 class YLOPerPLOSemester(models.Model):
-    curriculum = models.ForeignKey('Curriculum', on_delete=models.CASCADE)
-    plo = models.CharField(max_length=50)  # เช่น "PLO1", "PLO2"
-    semester = models.PositiveSmallIntegerField()  # 1–8
-    summary_text = models.TextField(blank=True, null=True)  # ✅ Rich Text สำหรับสรุป YLO
+    curriculum = models.ForeignKey(Curriculum, on_delete=models.CASCADE)
+    plo = models.CharField(max_length=50)
+    semester = models.PositiveSmallIntegerField()
+    summary_text = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f"YLO Summary {self.plo} - Sem {self.semester}"
+
+
+class KSECItem(models.Model):
+    curriculum = models.ForeignKey(Curriculum, on_delete=models.CASCADE)
+    semester = models.IntegerField()
+    type = models.CharField(max_length=1, choices=[
+        ('K', 'Knowledge'),
+        ('S', 'Skill'),
+        ('E', 'Ethics'),
+        ('C', 'Character'),
+    ])
+    category_type = models.CharField(max_length=2, choices=[
+        ('GE', 'General Education'),
+        ('CE', 'Core Education')
+    ])
+    description = models.TextField()
+    sort_order = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.category_type}({self.type}){self.sort_order + 1}"
+
+
+class CLO(models.Model):
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    index = models.PositiveIntegerField()
+    clo = models.TextField()
+    bloom = models.CharField(max_length=50, blank=True, null=True)
+    k = models.CharField(max_length=20, blank=True, null=True)
+    s = models.CharField(max_length=20, blank=True, null=True)
+    e = models.CharField(max_length=20, blank=True, null=True)
+    c = models.CharField(max_length=20, blank=True, null=True)
+
+    class Meta:
+        db_table = 'table_clo'
+        ordering = ['index']
+
+    def __str__(self):
+        return f"{self.course.course_code} - CLO{self.index}"
+
+
+class CLOSummary(models.Model):
+    course = models.OneToOneField(Course, on_delete=models.CASCADE)
+    bloom_score = models.IntegerField(default=0)
+    k_percent = models.FloatField(default=0.0)
+    s_percent = models.FloatField(default=0.0)
+    e_percent = models.FloatField(default=0.0)
+    c_percent = models.FloatField(default=0.0)
+
+    class Meta:
+        db_table = 'table_clo_summary'
+
+    def __str__(self):
+        return f"Summary for {self.course.course_code}"

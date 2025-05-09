@@ -3,7 +3,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>ตารางแผนการเรียนตาม YLO ของภาคการศึกษา {{ semester_str }}</title>
+    <title>ตารางแผนการเรียนตาม YLO ของภาคการศึกษา ปีที่ {{ semester_str }}</title>
     <style>
         table {
             width: 100%;
@@ -22,7 +22,7 @@
         .readonly-cell {
             background-color: #f0f0f0;
         }
-        input[type="text"] {
+        input[type="text"], textarea {
             width: 95%;
             padding: 4px;
             box-sizing: border-box;
@@ -65,16 +65,45 @@
             text-align: left;
             margin: 5px 0;
         }
+        .icon-link {
+            text-decoration: none;
+            margin-right: 6px;
+            font-size: 18px;
+            vertical-align: middle;
+        }
+        th a {
+            text-decoration: none;
+            color: #2a3f5f;
+        }
     </style>
+    {% if access_mode == 'edit' %}
+    <script>
+        function openKsecPopup(courseId, type) {
+            const url = `/curriculum/{{ curriculum_id }}/select-ksec/?type=${type}&semester={{ semester }}&course_id=${courseId}`;
+            const popup = window.open(url, '_blank', 'width=600,height=500');
+
+            window.receiveKsecSelection = function(courseId, type, selectedItems) {
+                const text = selectedItems.join(', ');
+                document.getElementById(`${type}_display_${courseId}`).value = text;
+                document.getElementById(`${type}_value_${courseId}`).value = text;
+            };
+        }
+    </script>
+    {% endif %}
 </head>
-
 <body>
-
+    {% if messages %}
+    <script>
+        {% for message in messages %}
+            alert("{{ message|escapejs }}");
+        {% endfor %}
+    </script>
+    {% endif %}
 <div class="header-title">
-    ตารางแผนการเรียนตาม YLO ของภาคการศึกษา {{ semester_str }}
+    ตารางแผนการเรียนตาม YLO ของภาคการศึกษา ปีที่ {{ semester_str }}
 </div>
 
-<form method="POST" action="{% url 'save_ylo_studyplan' curriculum_id=curriculum_id semester=semester %}">
+<form method="POST" action="{% url 'save_ylo_studyplan' curriculum_id=curriculum_id semester=semester %}?mode={{ access_mode }}">
     {% csrf_token %}
     <table>
         <thead>
@@ -82,31 +111,37 @@
                 <th>รหัสวิชา</th>
                 <th>ชื่อรายวิชา</th>
                 <th>หน่วยกิต</th>
-                <th>Knowledge</th>
-                <th>Skills</th>
-                <th>Ethics</th>
-                <th>Character</th>
+                <th><a href="{% url 'edit_ksec_choices' curriculum_id=curriculum_id semester=semester type='K' %}" target="_blank">🔗 Knowledge</a></th>
+                <th><a href="{% url 'edit_ksec_choices' curriculum_id=curriculum_id semester=semester type='S' %}" target="_blank">🔗 Skills</a></th>
+                <th><a href="{% url 'edit_ksec_choices' curriculum_id=curriculum_id semester=semester type='E' %}" target="_blank">🔗 Ethics</a></th>
+                <th><a href="{% url 'edit_ksec_choices' curriculum_id=curriculum_id semester=semester type='C' %}" target="_blank">🔗 Character</a></th>
             </tr>
         </thead>
         <tbody>
             {% for course in courses %}
             <tr>
                 <td class="readonly-cell">{{ course.course_code }}</td>
-                <td class="readonly-cell">{{ course.course_name }}</td>
+                <td class="readonly-cell" style="text-align: left;">
+                    <a href="{% url 'clo_ksec_mapping' curriculum_id=curriculum_id course_id=course.id %}?from_link=1" target="_blank" class="icon-link">📋</a>
+                    {{ course.course_name }}
+                </td>
                 <td class="readonly-cell">{{ course.credits }}</td>
-                <td><input type="text" name="knowledge_{{ course.id }}" value="{{ course.knowledge|default_if_none:'' }}"></td>
-                <td><input type="text" name="skills_{{ course.id }}" value="{{ course.skills|default_if_none:'' }}"></td>
-                <td><input type="text" name="ethics_{{ course.id }}" value="{{ course.ethics|default_if_none:'' }}"></td>
-                <td><input type="text" name="character_{{ course.id }}" value="{{ course.character|default_if_none:'' }}"></td>
+                {% for type in 'KSEC' %}
+                <td>
+                    {% if access_mode == 'edit' %}
+                        <button type="button" onclick="openKsecPopup({{ course.id }}, '{{ type }}')">📋</button><br>
+                    {% endif %}
+                    <textarea id="{{ type }}_display_{{ course.id }}" readonly>{{ course|get_ksec_value:type }}</textarea>
+                    <input type="hidden" name="{{ type|lower }}_{{ course.id }}" id="{{ type }}_value_{{ course.id }}" value="{{ course|get_ksec_value:type }}">
+                </td>
+                {% endfor %}
             </tr>
             {% endfor %}
 
-            <!-- ✅ แถวรวมหน่วยกิต -->
             <tr style="background-color: #eef; font-weight: bold;">
                 <td colspan="2" style="text-align: right;">รวมหน่วยกิต</td>
-                <td>
-                    {{ courses|map:'credits'|sum_list }}
-                </td>
+                <td>{{ courses|map:'credits'|sum_list }}</td>
+                <td colspan="4"></td>
             </tr>
         </tbody>
     </table>
@@ -118,7 +153,7 @@
     {% endif %}
 </form>
 
-<!-- 🔽 ส่วนแสดงรายการ YLO -->
+<!-- 🔽 แสดง YLO -->
 <div class="ylo-section">
     <h3>รายการ YLO ในภาคการศึกษานี้</h3>
     {% for ylo in ylo_list %}

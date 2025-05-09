@@ -245,7 +245,9 @@
         </form>
         <form method="POST" action="{% url 'sync_curriculum_example_to_real' curriculum_id=curriculum.id %}" style="display: inline;">
             {% csrf_token %}
-            <button type="submit" class="reset-btn" onclick="return confirm('ข้อมูลปัจจุบันจะถูกเขียนทับ! คุณต้องการดึงข้อมูลตัวอย่างกลับมาหรือไม่?')">♻️ Restore</button>
+            <button type="submit" class="reset-btn" onclick="return confirm('ข้อมูลปัจจุบันจะถูกเขียนทับ! คุณต้องการดึงข้อมูลตัวอย่างกลับมาหรือไม่?')">
+                ♻️ Restore
+            </button>
         </form>
     </div>
     {% endif %}

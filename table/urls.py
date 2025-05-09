@@ -2,8 +2,11 @@ from django.urls import path
 from . import views
 from . import views_course
 from . import views_plo
-from . import views_ylo           # ✅ สำหรับตาราง YLO
-from . import admin_views         # ✅ สำหรับ Backup/Restore/Download
+from . import views_ylo
+from . import views_ksec
+from . import views_ksec_select
+from . import admin_views
+from . import views_clo
 
 urlpatterns = [
     # ✅ หน้าเลือกหลักสูตร
@@ -22,16 +25,28 @@ urlpatterns = [
     path('curriculum/<int:curriculum_id>/course-list-plo/<int:row_id>/<int:semester>/', views_plo.course_list_plo, name='course_list_plo'),
     path('curriculum/<int:curriculum_id>/course-list-plo/<int:row_id>/<int:semester>/save/', views_plo.save_course_list_plo, name='save_course_list_plo'),
 
-    # ✅ ตารางแผนการเรียนตาม YLO
+    # ✅ ตารางแผนการเรียน YLO
     path('curriculum/<int:curriculum_id>/ylo-studyplan/<int:semester>/', views_ylo.ylo_studyplan_view, name='ylo_studyplan_view'),
     path('curriculum/<int:curriculum_id>/ylo-studyplan/<int:semester>/save/', views_ylo.save_ylo_studyplan, name='save_ylo_studyplan'),
 
-    # ✅ ฟังก์ชัน Sync ข้อมูลระหว่างฐาน real ↔ example
-    path('sync-db/', admin_views.sync_real_to_example, name='sync_real_to_example'),  # 🔁 ทั้งฐาน real → example
-    path('curriculum/<int:curriculum_id>/backup/', views.sync_curriculum_real_to_example, name='sync_curriculum_real_to_example'),  # 🔁 หลักสูตรเดียว real → example (user page)
-    path('curriculum/<int:curriculum_id>/restore/', admin_views.sync_curriculum_example_to_real, name='sync_curriculum_example_to_real'),  # ✅ หลักสูตรเดียว example → real (admin page)
+    # ✅ แก้ไขรายการ K/S/E/C
+    path('curriculum/<int:curriculum_id>/ksec/<int:semester>/<str:type>/', views_ksec.edit_ksec_choices, name='edit_ksec_choices'),
 
-    # ✅ ปุ่มดาวน์โหลดฐานข้อมูล
+    # ✅ Popup เลือกรายการ K/S/E/C
+    path('curriculum/<int:curriculum_id>/select-ksec/', views_ksec_select.select_ksec_items, name='select_ksec_items'),
+
+    # ✅ Sync และ Backup/Restore
+    path('sync-db/', admin_views.sync_real_to_example, name='sync_real_to_example'),
+    path('curriculum/<int:curriculum_id>/backup/', views.sync_curriculum_real_to_example, name='sync_curriculum_real_to_example'),
+    path('curriculum/<int:curriculum_id>/restore/', views.sync_curriculum_example_to_real, name='sync_curriculum_example_to_real'),
+
+    # ✅ ปุ่มดาวน์โหลดฐานของ DB
     path('download-db/all/', views.download_all_databases, name='download_all_databases'),
     path('download-db/<str:db_name>/', views.download_database, name='download_database'),
+
+    # ✅ CLO-KSEC Mapping
+    path('curriculum/<int:curriculum_id>/clo-ksec-mapping/<int:course_id>/', views_clo.clo_ksec_mapping, name='clo_ksec_mapping'),
+    path('curriculum/<int:curriculum_id>/clo-ksec-mapping/<int:course_id>/save/', views_clo.save_clo_ksec_mapping, name='save_clo_ksec_mapping'),
+    path('curriculum/<int:curriculum_id>/clo-ksec-mapping/<int:course_id>/reset/', views_clo.reset_clo_ksec_mapping, name='reset_clo_ksec_mapping'),
+    path('curriculum/<int:curriculum_id>/clo-ksec-mapping/<int:course_id>/save-session/', views_clo.save_clo_ksec_to_session, name='save_clo_ksec_to_session'),  # ← ✅ เพิ่มตรงนี้
 ]
