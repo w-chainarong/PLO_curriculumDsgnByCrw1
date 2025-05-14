@@ -460,11 +460,12 @@ function calculateKSECPercents() {
         });
     </script>
     {% endif %}    
+    {% if not readonly %}
     <form method="POST" action="{% url 'reset_clo_ksec_mapping' curriculum_id=curriculum.id course_id=course.id %}" onsubmit="return confirm('คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตตารางนี้?')">
         {% csrf_token %}
         <button type="submit" class="reset-btn">♻️ รีเซ็ตตาราง</button>
     </form>
-
+    {% endif %}
     <button class="close-btn" onclick="closeWindow()">🔙 ปิดหน้าต่างนี้</button>
     {% if readonly and session_saved %}
     <script>
