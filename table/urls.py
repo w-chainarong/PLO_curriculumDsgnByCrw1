@@ -7,6 +7,7 @@ from . import views_ksec
 from . import views_ksec_select
 from . import admin_views
 from . import views_clo
+from . import views_plo_summary
 
 urlpatterns = [
     # ✅ หน้าเลือกหลักสูตร
@@ -49,4 +50,8 @@ urlpatterns = [
     path('curriculum/<int:curriculum_id>/clo-ksec-mapping/<int:course_id>/save/', views_clo.save_clo_ksec_mapping, name='save_clo_ksec_mapping'),
     path('curriculum/<int:curriculum_id>/clo-ksec-mapping/<int:course_id>/reset/', views_clo.reset_clo_ksec_mapping, name='reset_clo_ksec_mapping'),
     path('curriculum/<int:curriculum_id>/clo-ksec-mapping/<int:course_id>/save-session/', views_clo.save_clo_ksec_to_session, name='save_clo_ksec_to_session'),  # ← ✅ เพิ่มตรงนี้
+    
+    # ✅ สรุป CLOs ต่อ PLO
+    path('curriculum/<int:curriculum_id>/plo-summary/', views_plo_summary.plo_summary_view, name='plo_summary_view'),
+
 ]
