@@ -118,7 +118,7 @@
                 <strong>รายการ PLO ทั้งหมดของหลักสูตร:</strong>
                 <ul>
                     {% for label, desc in plo_descriptions.items %}
-                        <li><strong>{{ label }}</strong>: {{ desc|cut:label|cut:" "|cut:"　" }}</li>
+                        <li><strong>{{ label }}</strong> {{ desc|cut:label }}</li>
                     {% endfor %}
                 </ul>
             </div>
