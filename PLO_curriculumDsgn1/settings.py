@@ -26,16 +26,8 @@ SECRET_KEY = 'django-insecure-d@&q_w))4#yjtk&%u_dxdoc-vai(r3w&#4^v7jxtw6xtljf8ov
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+ALLOWED_HOSTS = []
 
-ALLOWED_HOSTS = [
-    'plo-curriculum-dsgn.up.railway.app',
-    '127.0.0.1',
-    'localhost'
-]
-
-CSRF_TRUSTED_ORIGINS = [
-    'https://plo-curriculum-dsgn.up.railway.app'
-]
 
 # Application definition
 
@@ -50,7 +42,6 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'whitenoise.middleware.WhiteNoiseMiddleware',   # ✅ เพิ่มบรรทัดนี้
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -134,13 +125,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-# ✅ เพิ่มตรงนี้
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-

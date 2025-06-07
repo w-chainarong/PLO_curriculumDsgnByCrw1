@@ -31,11 +31,12 @@ def ylo_studyplan_view(request, curriculum_id, semester):
     ylo_list = []
     semester_str = convert_semester(semester)
     for idx, ylo in enumerate(ylo_entries, start=1):
-        ylo_code = f"YLO {semester_str}-{idx}"
-        ylo_list.append({
-            'code': ylo_code,
-            'summary_text': ylo.summary_text,
-        })
+        if ylo.summary_text and str(ylo.summary_text).strip():  # <-- เพิ่ม if แค่ตรงนี้!
+            ylo_code = f"YLO {semester_str}-{idx}"
+            ylo_list.append({
+                'code': ylo_code,
+                'summary_text': ylo.summary_text,
+            })
 
     return render(request, 'table/course_list_ylo.html', {
         'curriculum_id': curriculum_id,

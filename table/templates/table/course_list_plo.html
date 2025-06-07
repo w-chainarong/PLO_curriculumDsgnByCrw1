@@ -58,7 +58,13 @@
 </head>
 
 <body>
-
+{% if messages %}
+    {% for message in messages %}
+        <div style="color: #256029; background: #f0f9eb; border: 1px solid #b4e5c1; border-radius: 8px; padding: 8px 18px; margin-bottom: 12px; font-size: 16px;">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
 <div class="header-title">รายการรายวิชาในปีที่ {{ semester_str }}</div>
 <div class="header-title">จากหมวดวิชา: {{ row.name }}</div>
 

@@ -2,6 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponseNotFound
 from django.contrib import messages
 from .models import Curriculum, Course, KSECItem, CLO, CLOSummary
+from table.views import sync_curriculum_real_to_example  # นำเข้าให้
+from .models import Curriculum, Course, CreditRow  # <-- เพิ่ม CreditRow ด้วย
 import re
 
 
@@ -194,6 +196,22 @@ def clo_ksec_mapping(request, curriculum_id, course_id):
 
 # ✅ บันทึก CLO ทั้งหมดลงฐาน real (รวมถึง course.description)
 def save_clo_ksec_mapping(request, curriculum_id, course_id):
+
+    mode = request.GET.get('mode') or request.session.get('access_mode', 'view')
+
+    need_sync = should_sync_course(course_id)
+
+    if need_sync:
+        print("SYNC IS NEEDED!")
+        if mode == 'edit':
+            sync_curriculum_real_to_example(request, curriculum_id)
+        else:
+            messages.error(request,
+                "⚠️ ข้อมูลในฐาน example ไม่ตรงกับฐาน real กรุณา sync real → example ก่อนบันทึก")
+            return redirect('clo_ksec_mapping', curriculum_id=curriculum_id, course_id=course_id)
+    else:
+        print("NO SYNC NEEDED")
+
     if request.method != 'POST':
         return HttpResponseNotFound("⛔ Method ไม่ถูกต้อง")
 
@@ -330,3 +348,43 @@ def build_clo_list_from_post(request):
         clo_list.append({'index': i+1, 'clo': clo_full_text, **clo_data})
 
     return clo_list
+
+def Xshould_sync_course(course_id):
+    try:
+        # เช็คว่ารายวิชาเดียวกันมีใน default DB มั้ย (แค่ id พอ)
+        if not Course.objects.using('default').filter(id=course_id).exists():
+            print("[SYNC NEEDED] Course id", course_id, "not found in default DB")
+            return True
+        # ถ้าจะให้ robust ขึ้น อาจเช็ค curriculum_id, credit_row_id ด้วย
+        return False
+    except Exception as e:
+        print("[should_sync_course ERROR]", e)
+        return True  # ป้องกันไว้ก่อน
+
+def should_sync_course(course_id):
+    try:
+        real = Course.objects.using('real').get(id=course_id)
+        try:
+            default = Course.objects.using('default').get(id=course_id)
+        except Course.DoesNotExist:
+            print("[SYNC NEEDED] Course id", course_id, "not found in default DB")
+            return True
+        # ตัด credit_row_id ออก ไม่ตรวจสอบ
+        for f in ['course_code', 'course_name', 'credits', 'curriculum_id', 'semester', 'plo']:
+            print(f"CHECK {f}: real={getattr(real, f, None)}, default={getattr(default, f, None)}")
+            if getattr(real, f, None) != getattr(default, f, None):
+                print(f"[SYNC NEEDED] Mismatch on {f}")
+                return True
+        # parent check --> **ลบบรรทัดนี้ทิ้ง**
+        if not Curriculum.objects.using('default').filter(id=real.curriculum_id).exists():
+            print("[SYNC NEEDED] Curriculum id", real.curriculum_id, "not found in default DB")
+            return True
+        # --- ตรงนี้ตัดทิ้ง ---
+        # if real.credit_row_id and not CreditRow.objects.using('default').filter(id=real.credit_row_id).exists():
+        #     print("[SYNC NEEDED] CreditRow id", real.credit_row_id, "not found in default DB")
+        #     return True
+        print("[NO SYNC NEEDED] Everything matched")
+        return False
+    except Exception as e:
+        print("[should_sync_course ERROR]", e)
+        return True

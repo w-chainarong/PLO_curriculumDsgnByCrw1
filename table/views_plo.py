@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db.models import Sum
 from .models import CreditRow, Course, YLOPerPLOSemester
+from django.contrib import messages
 
 def convert_semester(sem):
     year = (sem - 1) // 2 + 1
@@ -82,4 +83,5 @@ def save_course_list_plo(request, curriculum_id, row_id, semester):
             semester=semester,
             defaults={'summary_text': summary_text}
         )
+        messages.success(request, "✅ บันทึก YLO สำเร็จ")
     return redirect('course_list_plo', curriculum_id=curriculum_id, row_id=row_id, semester=semester)

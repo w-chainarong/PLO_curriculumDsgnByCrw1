@@ -1,0 +1,8 @@
+# กันไฟล์ชั่วคราวและไฟล์แคชของ Python
+__pycache__/
+*.pyc
+
+# กันไฟล์ฐานข้อมูล SQLite ทั้งหมด ยกเว้นสองไฟล์นี้
+*.sqlite3
+!example.sqlite3
+!real.sqlite3

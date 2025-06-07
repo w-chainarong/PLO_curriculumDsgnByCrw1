@@ -81,41 +81,75 @@ def save_course_list(request, curriculum_id, row_id, semester):
             return redirect('course_list', curriculum_id=curriculum_id, row_id=row_id, semester=semester)
 
         if row_id == 'free_elective':
-            Course.objects.using(db).filter(
+            existing_courses = Course.objects.using(db).filter(
                 curriculum=curriculum,
                 category='free_elective',
                 semester=semester
-            ).delete()
+            )
+            existing_map = {c.course_code.strip(): c for c in existing_courses}
+            updated_codes = set()
+
             for code, name, credit, plo in zip(codes, names, credits, plos):
+                code_key = code.strip()
+                updated_codes.add(code_key)
+                if code_key in existing_map:
+                    course = existing_map[code_key]
+                    course.course_name = name.strip()
+                    course.credits = int(credit or 0)
+                    course.plo = plo.strip()
+                    course.save(using=db)
+                else:
+                    Course.objects.using(db).create(
+                        curriculum=curriculum,
+                        category='free_elective',
+                        semester=semester,
+                        course_code=code_key,
+                        course_name=name.strip(),
+                        credits=int(credit or 0),
+                        plo=plo.strip()
+                    )
+
+            for code_key, course in existing_map.items():
+                if code_key not in updated_codes:
+                    course.delete(using=db)
+
+            messages.success(request, "✅ บันทึกหมวดวิชาเลือกเสรีเรียบร้อยแล้ว")
+            return redirect('course_list', curriculum_id=curriculum_id, row_id='free_elective', semester=semester)
+
+        # แถวปกติ
+        row = get_object_or_404(CreditRow.objects.using(db), curriculum=curriculum, id=row_id)
+
+        existing_courses = Course.objects.using(db).filter(
+            curriculum=curriculum,
+            credit_row=row,
+            semester=semester
+        )
+        existing_map = {c.course_code.strip(): c for c in existing_courses}
+        updated_codes = set()
+
+        for code, name, credit, plo in zip(codes, names, credits, plos):
+            code_key = code.strip()
+            updated_codes.add(code_key)
+            if code_key in existing_map:
+                course = existing_map[code_key]
+                course.course_name = name.strip()
+                course.credits = int(credit or 0)
+                course.plo = plo.strip()
+                course.save(using=db)
+            else:
                 Course.objects.using(db).create(
                     curriculum=curriculum,
-                    category='free_elective',
+                    credit_row=row,
                     semester=semester,
-                    course_code=code.strip(),
+                    course_code=code_key,
                     course_name=name.strip(),
                     credits=int(credit or 0),
                     plo=plo.strip()
                 )
-            messages.success(request, "✅ บันทึกหมวดวิชาเลือกเสรีเรียบร้อยแล้ว")
-            return redirect('course_list', curriculum_id=curriculum_id, row_id='free_elective', semester=semester)
 
-        row = get_object_or_404(CreditRow.objects.using(db), curriculum=curriculum, id=row_id)
-        Course.objects.using(db).filter(
-            curriculum=curriculum,
-            credit_row=row,
-            semester=semester
-        ).delete()
-
-        for code, name, credit, plo in zip(codes, names, credits, plos):
-            Course.objects.using(db).create(
-                curriculum=curriculum,
-                credit_row=row,
-                semester=semester,
-                course_code=code.strip(),
-                course_name=name.strip(),
-                credits=int(credit or 0),
-                plo=plo.strip()
-            )
+        for code_key, course in existing_map.items():
+            if code_key not in updated_codes:
+                course.delete(using=db)
 
         # อัปเดตชื่อแถว PLO ถ้ามีการเปลี่ยน
         plo_name_key = f'plo_name_{row_id}'
