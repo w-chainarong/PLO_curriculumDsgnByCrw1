@@ -32,6 +32,9 @@ ALLOWED_HOSTS = [
     "plo-curriculum-dsgn.up.railway.app",
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://plo-curriculum-dsgn.up.railway.app"
+]
 
 # Application definition
 
