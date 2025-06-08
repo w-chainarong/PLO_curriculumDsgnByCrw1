@@ -19,6 +19,14 @@
         th {
             background-color: #eee;
         }
+        /* ✅ เพิ่มตรงนี้สำหรับรหัสวิชา */
+        .code-col {
+            width: 105px;
+            min-width: 105px;
+            max-width: 105px;
+            white-space: nowrap;
+            text-align: center;
+        }
         .readonly-cell {
             background-color: #f0f0f0;
         }
@@ -108,7 +116,7 @@
     <table>
         <thead>
             <tr>
-                <th>รหัสวิชา</th>
+                <th class="code-col">รหัสวิชา</th>
                 <th>ชื่อรายวิชา</th>
                 <th>หน่วยกิต</th>
                 <th><a href="{% url 'edit_ksec_choices' curriculum_id=curriculum_id semester=semester type='K' %}" target="_blank">🔗 Knowledge</a></th>
@@ -120,7 +128,7 @@
         <tbody>
             {% for course in courses %}
             <tr>
-                <td class="readonly-cell">{{ course.course_code }}</td>
+                <td class="readonly-cell code-col">{{ course.course_code }}</td>
                 <td class="readonly-cell" style="text-align: left;">
                     <a href="{% url 'clo_ksec_mapping' curriculum_id=curriculum_id course_id=course.id %}?from_link=1" target="_blank" class="icon-link">📋</a>
                     {{ course.course_name }}
