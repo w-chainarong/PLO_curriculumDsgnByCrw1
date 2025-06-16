@@ -118,7 +118,9 @@ def credit_table(request, curriculum_id):
         save_rows('general', 'general_name_new', 'general_credit_new')
         save_rows('core', 'core_name_new', 'core_credit_new')
         save_rows('plo', 'plo_name_new', 'plo_credit_new')
-
+        # ✅ อัปเดต YLO ให้ตรงกับข้อมูล PLO และรายวิชา
+        from .views_ylo import update_ylo_for_curriculum
+        update_ylo_for_curriculum(curriculum)
         free_name = 'หมวดวิชาเลือกเสรี'
         free_credits = [int(request.POST.get(f'{free_name}_{i}', 0)) for i in range(8)]
         CreditRow.objects.using('real').update_or_create(

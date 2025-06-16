@@ -63,6 +63,35 @@ def save_ylo_studyplan(request, curriculum_id, semester):
             course.character = request.POST.get(f'c_{course.id}', '').strip()
             course.save(using=db)
 
+        #update_ylo_for_curriculum(curriculum)
         messages.success(request, "✅ บันทึกข้อมูล YLO Study Plan สำเร็จ")
 
     return redirect('ylo_studyplan_view', curriculum_id=curriculum_id, semester=semester)
+
+
+def update_ylo_for_curriculum(curriculum):
+    from .models import Course, YLOPerPLOSemester
+
+    for sem in range(1, 9):
+        print(f"\n=== เทอม {sem} ===")
+        plo_with_credits = set()
+        courses = Course.objects.using('real').filter(curriculum=curriculum, semester=sem)
+
+        for course in courses:
+            print(f" - {course.course_code} | credits={course.credits} | PLO={course.plo}")
+            if not course.plo:
+                continue
+            plo_tag = course.plo.split(':')[0].strip()
+            if plo_tag and course.credits and course.credits > 0:
+                plo_with_credits.add(plo_tag)
+
+        print(f">> PLO ที่มีหน่วยกิต: {plo_with_credits}")
+
+        # ลบ YLO ที่ไม่มีหน่วยกิต
+        for ylo in YLOPerPLOSemester.objects.using('real').filter(curriculum=curriculum, semester=sem):
+            ylo_plo_tag = ylo.plo.strip().split(":")[0].strip() if ylo.plo else ''
+            if ylo_plo_tag not in plo_with_credits:
+                print(f"[ลบ] YLO เทอม {sem}, PLO={ylo.plo} เนื่องจากไม่มีวิชาโยง")
+                ylo.delete()
+            else:
+                print(f"[เก็บ] YLO เทอม {sem}, PLO={ylo.plo}")
