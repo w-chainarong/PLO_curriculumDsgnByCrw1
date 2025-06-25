@@ -191,19 +191,30 @@ def reset_credit_table(request, curriculum_id):
     db = 'real' if mode == 'edit' else 'default'
 
     if mode != 'edit':
-        # ✅ กรณีโหมดอ่านอย่างเดียว: แสดงข้อมูล + แจ้งเตือน
-        curriculum = get_object_or_404(Curriculum.objects.using(db), pk=curriculum_id)
-        all_rows = CreditRow.objects.using(db).filter(curriculum=curriculum)
-        general_rows = [(row.id, row.name, row.credit_list(), row.total_credits()) for row in all_rows.filter(row_type='general')]
-        core_rows = [(row.id, row.name, row.credit_list(), row.total_credits()) for row in all_rows.filter(row_type='core')]
-        plo_rows = [(row.id, row.name, row.credit_list(), row.total_credits()) for row in all_rows.filter(row_type='plo')]
-        free_elective = all_rows.filter(row_type='free').first()
-        free_elective_tuple = (free_elective.name, free_elective.credit_list(), free_elective.total_credits()) if free_elective else None
-        total_credits_all = sum(row.total_credits() for row in all_rows)
-        plo_percentages = {
-            str(row.id): round((row.total_credits() / total_credits_all) * 100, 2) if total_credits_all else 0
-            for row in all_rows.filter(row_type='plo')
-        }
+        return redirect('credit_table', curriculum_id=curriculum_id)
+
+    curriculum = get_object_or_404(Curriculum.objects.using(db), pk=curriculum_id)
+
+    if request.method == 'POST':
+        # ✅ ลบ CLO และ CLOSummary ที่โยงกับ Course
+        CLO.objects.using(db).filter(course__curriculum=curriculum).delete()
+        CLOSummary.objects.using(db).filter(course__curriculum=curriculum).delete()
+
+        # ✅ ลบ Course
+        Course.objects.using(db).filter(curriculum=curriculum).delete()
+
+        # ✅ ลบ YLO Summary
+        YLOPerPLOSemester.objects.using(db).filter(curriculum=curriculum).delete()
+
+        # ✅ ลบ KSECItem
+        KSECItem.objects.using(db).filter(curriculum=curriculum).delete()
+
+        # ✅ ลบ CreditRow (รวมถึง Free, PLO, Core, General)
+        CreditRow.objects.using(db).filter(curriculum=curriculum).delete()
+
+        # ✅ (ไม่ลบ Curriculum เอง) เพื่อให้ยังอยู่ในระบบ
+        return redirect('credit_table', curriculum_id=curriculum.id)
+
 
         return render(request, 'table/credit_table.html', {
             'curriculum': curriculum,
