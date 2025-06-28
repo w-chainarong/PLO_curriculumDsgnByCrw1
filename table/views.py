@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Sum
+from .models import CreditRow, Course
 import re
 from django.contrib import messages  # 🔥 เพิ่มไว้ด้านบนด้วยนะครับ (import messages)
 from django.http import FileResponse, HttpResponse, HttpResponseNotFound
@@ -8,6 +9,10 @@ import os
 import io
 from .models import Curriculum, CreditRow, Course, YLOPerPLOSemester, KSECItem
 from .models import CLO, CLOSummary  # ด้านบนของไฟล์ต้อง import ด้วย
+from django.http import HttpResponse
+import matplotlib.pyplot as plt
+import numpy as np
+from io import BytesIO
 
 
 headers = [
@@ -121,6 +126,8 @@ def credit_table(request, curriculum_id):
         # ✅ อัปเดต YLO ให้ตรงกับข้อมูล PLO และรายวิชา
         from .views_ylo import update_ylo_for_curriculum
         update_ylo_for_curriculum(curriculum)
+        sync_plo_credits_to_creditrow(curriculum) 
+        #debug_print_plo_credits(curriculum)
         free_name = 'หมวดวิชาเลือกเสรี'
         free_credits = [int(request.POST.get(f'{free_name}_{i}', 0)) for i in range(8)]
         CreditRow.objects.using('real').update_or_create(
@@ -133,6 +140,7 @@ def credit_table(request, curriculum_id):
         return redirect('credit_table', curriculum_id=curriculum.id)
 
     all_rows = CreditRow.objects.using(db).filter(curriculum=curriculum)
+
     general_rows = [(row.id, row.name, row.credit_list(), row.total_credits()) for row in all_rows.filter(row_type='general')]
     core_rows = [(row.id, row.name, row.credit_list(), row.total_credits()) for row in all_rows.filter(row_type='core')]
     plo_rows = [(row.id, row.name, row.credit_list(), row.total_credits()) for row in all_rows.filter(row_type='plo').order_by('id')]
@@ -551,3 +559,92 @@ def download_database(request, db_name):
         return HttpResponse("File not found", status=404)
 
     return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=f'{db_name}.sqlite3')
+
+def sync_plo_credits_to_creditrow(curriculum):
+    # อัปเดตเฉพาะฐาน real (สำหรับโหมด edit)
+    plo_rows = CreditRow.objects.using('real').filter(curriculum=curriculum, row_type='plo')
+    for row in plo_rows:
+        if ':' in row.name:
+            plo_tag = row.name.split(':')[0].strip()
+        else:
+            plo_tag = row.name.strip()
+        new_credits = []
+        for sem in range(1, 9):
+            total = Course.objects.using('real').filter(
+                curriculum=curriculum,
+                semester=sem,
+                plo__startswith=plo_tag
+            ).aggregate(Sum('credits'))['credits__sum'] or 0
+            new_credits.append(total)
+        for i, val in enumerate(new_credits):
+            setattr(row, f'credits_sem{i+1}', val)
+        row.save(using='real')
+
+def debug_print_plo_credits(curriculum):
+    # ดึง PLO เฉพาะในฐาน real
+    plo_rows = CreditRow.objects.using('real').filter(curriculum=curriculum, row_type='plo')
+    print("\n====== DEBUG: ค่า credits_sem1-8 ของแถว PLOs ======")
+    for row in plo_rows:
+        print(f"{row.name:40s} | ", end='')
+        print(" ".join([str(getattr(row, f'credits_sem{i}')) for i in range(1, 9)]))
+    print("===============================================\n")
+
+
+def plo_graph_from_creditrow(request, curriculum_id):
+    mode = request.session.get('access_mode', 'view')
+    db = 'real' if mode == 'edit' else 'default'
+
+    # Get PLO rows
+    plo_rows = CreditRow.objects.using(db).filter(curriculum_id=curriculum_id, row_type='plo').order_by('id')
+    plo_labels = []
+    plo_values = []
+    for row in plo_rows:
+        tag = row.name.split(':')[0].strip()
+        plo_labels.append(tag)
+        plo_values.append([
+            row.credits_sem1, row.credits_sem2, row.credits_sem3, row.credits_sem4,
+            row.credits_sem5, row.credits_sem6, row.credits_sem7, row.credits_sem8,
+        ])
+
+    # Handle no data
+    if len(plo_labels) == 0:
+        plt.figure(figsize=(10, 5))
+        plt.axis('off')
+        plt.text(0.5, 0.5, 'No PLO data available for graph', fontsize=28, color='red',
+                 ha='center', va='center', transform=plt.gca().transAxes)
+        buf = BytesIO()
+        plt.savefig(buf, format='png')
+        plt.close()
+        buf.seek(0)
+        return HttpResponse(buf.getvalue(), content_type='image/png')
+
+    # Prepare year sums: year 1 = sem1+sem2, year 2 = sem3+sem4, year 3 = sem5+sem6, year 4 = sem7+sem8
+    plo_values = np.array(plo_values).T   # shape: (8, n_plo)
+    year_labels = ['Year 1', 'Year 2', 'Year 3', 'Year 4']
+    year_data = [
+        plo_values[0] + plo_values[1],   # Year 1
+        plo_values[2] + plo_values[3],   # Year 2
+        plo_values[4] + plo_values[5],   # Year 3
+        plo_values[6] + plo_values[7],   # Year 4
+    ]   # shape: (4, n_plo)
+
+    ind = np.arange(len(plo_labels))
+    bottom = np.zeros(len(plo_labels))
+    colors = ['#43a047', '#1976d2', '#fbc02d', '#d81b60']
+
+    plt.figure(figsize=(12, 5))
+    for i in range(4):
+        plt.bar(ind, year_data[i], bottom=bottom, label=year_labels[i], color=colors[i])
+        bottom += year_data[i]
+    plt.xticks(ind, plo_labels)
+    plt.xlabel('PLO')
+    plt.ylabel('Total Credits')
+    plt.title('PLO Credit Distribution by Year (Stacked Bar)')
+    plt.legend(title="Year")
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close()
+    buf.seek(0)
+    return HttpResponse(buf.getvalue(), content_type='image/png')

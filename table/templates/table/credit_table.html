@@ -390,12 +390,15 @@
             </td>
         </tr>
         {% endfor %}
-                
         <tr style="background-color: #eef;">
             <td colspan="2" style="text-align: center; vertical-align: middle;">
                 <a href="{% url 'plo_summary_view' curriculum.id %}" target="_blank"
                 class="no-underline" style="margin-right: 6px; font-size: 16px;" title="ดูรายวิชาและ CLOs ที่โยงกับ PLO">
                     📋
+                </a>
+                <a href="{% url 'plo_graph_from_creditrow' curriculum.id %}" target="_blank"
+                class="no-underline" style="margin-right: 6px; font-size: 16px;" title="ดูกราฟหน่วยกิต PLO (Stacked Bar)">
+                    📊
                 </a>
                 <strong>รวมหน่วยกิตหมวด PLOs</strong>
             </td>
@@ -403,7 +406,7 @@
             <td>
                 <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
                     <a href="{% url 'ylo_studyplan_view' curriculum_id=curriculum.id semester=sem %}?mode={{ access_mode }}" target="_blank" class="no-underline">📋</a>
-                <input type="number" value="{{ plo_semester_totals|get_item:sem }}" readonly style="width: 40px; text-align: center;">
+                    <input type="number" value="{{ plo_semester_totals|get_item:sem }}" readonly style="width: 40px; text-align: center;">
                 </div>
             </td>
             {% endfor %}
@@ -414,7 +417,7 @@
                     {% endwith %}
                 {% endwith %}
             </td>
-        </tr>     
+        </tr>
         </tbody>
     </table>
     {% if access_mode == 'edit' %}
