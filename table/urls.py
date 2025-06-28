@@ -53,5 +53,7 @@ urlpatterns = [
     
     # ✅ สรุป CLOs ต่อ PLO
     path('curriculum/<int:curriculum_id>/plo-summary/', views_plo_summary.plo_summary_view, name='plo_summary_view'),
+    # ✅ กราฟหน่วยกิตหมวด PLOs (Stacked Bar)
+    path('curriculum/<int:curriculum_id>/plo-graph/', views.plo_graph_from_creditrow, name='plo_graph_from_creditrow'),
 
 ]
